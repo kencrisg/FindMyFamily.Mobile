@@ -52,6 +52,9 @@ pnpm-debug.log*
 # Environment Variables & Secrets
 .env
 .env*.local
+.env.development
+.env.production
+!.env.example
 GoogleService-Info.plist
 google-services.json
 
