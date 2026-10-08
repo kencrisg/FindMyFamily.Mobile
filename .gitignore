@@ -54,6 +54,8 @@ pnpm-debug.log*
 .env*.local
 .env.development
 .env.production
+.env.android
+.env.ios
 !.env.example
 GoogleService-Info.plist
 google-services.json
