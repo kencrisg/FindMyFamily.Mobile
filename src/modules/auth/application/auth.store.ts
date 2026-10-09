@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { SecureStorageService } from '../../../shared/infrastructure/storage/secure-storage';
 import { apiClient } from '../../../shared/infrastructure/api/api-client';
 import { authRepository } from '../infrastructure/auth-api.repository';
-import { AuthUser, DeviceInfo, LoginCredentials, RegisterData } from '../domain/entities/auth.types';
+import { AuthUser, DeviceInfo, LoginCredentials } from '../domain/entities/auth.types';
 
 interface AuthState {
   user: AuthUser | null;
@@ -12,12 +12,13 @@ interface AuthState {
   
   initialize: () => Promise<void>;
   login: (credentials: LoginCredentials) => Promise<boolean>;
-  register: (data: RegisterData) => Promise<boolean>;
   logout: () => Promise<void>;
   clearError: () => void;
+  isSuperAdmin: () => boolean;
+  isFamilyAdmin: (familyId?: string) => boolean;
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
+export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   device: null,
   status: 'idle',
@@ -32,7 +33,7 @@ export const useAuthStore = create<AuthState>((set) => ({
         return;
       }
 
-      // Validate session and retrieve profile
+      // Validate session and retrieve profile with double-level roles
       const response = await apiClient.get('/api/users/me');
       const userProfile = response.data;
 
@@ -42,7 +43,9 @@ export const useAuthStore = create<AuthState>((set) => ({
           firstName: userProfile.firstName,
           lastName: userProfile.lastName,
           phoneNumber: userProfile.phoneNumber,
-          role: userProfile.role,
+          role: userProfile.systemRole || userProfile.role,
+          systemRole: userProfile.systemRole,
+          families: userProfile.families || [],
         },
         status: 'authenticated',
       });
@@ -61,43 +64,39 @@ export const useAuthStore = create<AuthState>((set) => ({
         refreshToken: result.refreshToken,
       });
 
-      set({
-        user: result.user,
-        device: result.device || null,
-        status: 'authenticated',
-        error: null,
-      });
+      // Enrich user profile immediately
+      try {
+        const meRes = await apiClient.get('/api/users/me');
+        const userProfile = meRes.data;
+        set({
+          user: {
+            id: userProfile.id,
+            firstName: userProfile.firstName,
+            lastName: userProfile.lastName,
+            phoneNumber: userProfile.phoneNumber,
+            role: userProfile.systemRole || userProfile.role,
+            systemRole: userProfile.systemRole,
+            families: userProfile.families || [],
+          },
+          device: result.device || null,
+          status: 'authenticated',
+          error: null,
+        });
+      } catch {
+        set({
+          user: result.user,
+          device: result.device || null,
+          status: 'authenticated',
+          error: null,
+        });
+      }
+
       return true;
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { message?: string } } };
       const errorMessage =
         axiosErr.response?.data?.message ||
         'Error al iniciar sesión. Verifique su número y contraseña.';
-      set({ status: 'unauthenticated', error: errorMessage });
-      return false;
-    }
-  },
-
-  register: async (data: RegisterData) => {
-    set({ status: 'loading', error: null });
-    try {
-      const result = await authRepository.register(data);
-      await SecureStorageService.saveTokens({
-        accessToken: result.accessToken,
-        refreshToken: result.refreshToken,
-      });
-
-      set({
-        user: result.user,
-        device: result.device || null,
-        status: 'authenticated',
-        error: null,
-      });
-      return true;
-    } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { message?: string } } };
-      const errorMessage =
-        axiosErr.response?.data?.message || 'Error al registrar la cuenta.';
       set({ status: 'unauthenticated', error: errorMessage });
       return false;
     }
@@ -114,4 +113,17 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   clearError: () => set({ error: null }),
+
+  isSuperAdmin: () => {
+    const user = get().user;
+    return user?.systemRole === 'admin' || user?.role === 'admin';
+  },
+
+  isFamilyAdmin: (familyId?: string) => {
+    const user = get().user;
+    if (!user) return false;
+    if (user.systemRole === 'admin' || user.role === 'admin') return true;
+    if (!familyId) return user.families?.some(f => f.familyRole === 'admin') ?? false;
+    return user.families?.some(f => f.familyId === familyId && f.familyRole === 'admin') ?? false;
+  },
 }));

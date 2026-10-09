@@ -29,3 +29,10 @@ export interface AddFamilyMemberData {
   phoneNumber: string;
   role?: string;
 }
+
+export interface CreateFamilyMemberUserData {
+  firstName: string;
+  lastName: string;
+  phoneNumber: string;
+  password: string;
+}

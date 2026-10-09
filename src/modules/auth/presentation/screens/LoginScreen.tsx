@@ -117,16 +117,11 @@ export const LoginScreen: React.FC = () => {
             </View>
           </View>
 
-          {/* Footer Register Link */}
+          {/* Footer Notice */}
           <View style={styles.footer}>
-            <Text style={styles.footerText}>¿Aún no tienes una cuenta?</Text>
-            <TouchableOpacity
-              onPress={() => router.push('/(auth)/register')}
-              activeOpacity={0.7}
-              style={styles.registerLink}
-            >
-              <Text style={styles.registerLinkText}>Crear cuenta nueva</Text>
-            </TouchableOpacity>
+            <Text style={styles.footerNoticeText}>
+              Acceso restringido. Tu cuenta debe ser creada por el Administrador de tu familia o de la plataforma.
+            </Text>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -216,17 +211,11 @@ const styles = StyleSheet.create({
     marginTop: Spacing.xl,
     paddingBottom: Spacing.md,
   },
-  footerText: {
-    ...Typography.body,
-    color: Colors.textSecondary,
-    fontSize: 16,
-  },
-  registerLink: {
-    paddingVertical: Spacing.xs,
-  },
-  registerLinkText: {
-    ...Typography.headline,
-    color: Colors.primary,
-    fontSize: 16,
+  footerNoticeText: {
+    ...Typography.footnote,
+    color: Colors.textTertiary,
+    textAlign: 'center',
+    paddingHorizontal: Spacing.lg,
+    lineHeight: 18,
   },
 });

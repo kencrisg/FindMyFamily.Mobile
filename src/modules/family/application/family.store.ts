@@ -1,6 +1,11 @@
 import { create } from 'zustand';
 import { familyRepository } from '../infrastructure/family-api.repository';
-import { Family, FamilyDetail, FamilyMemberSummary } from '../domain/entities/family.types';
+import {
+  CreateFamilyMemberUserData,
+  Family,
+  FamilyDetail,
+  FamilyMemberSummary,
+} from '../domain/entities/family.types';
 
 interface FamilyState {
   families: Family[];
@@ -13,6 +18,7 @@ interface FamilyState {
   selectFamily: (familyId: string) => Promise<void>;
   createFamily: (name: string) => Promise<boolean>;
   addMember: (phoneNumber: string) => Promise<boolean>;
+  createMemberUser: (data: CreateFamilyMemberUserData) => Promise<boolean>;
   removeMember: (userId: string) => Promise<boolean>;
   setSelectedMember: (member: FamilyMemberSummary | null) => void;
   clearError: () => void;
@@ -92,6 +98,25 @@ export const useFamilyStore = create<FamilyState>((set, get) => ({
       const axiosErr = err as { response?: { data?: { message?: string } } };
       set({
         error: axiosErr.response?.data?.message || 'No se pudo agregar al familiar.',
+        isLoading: false,
+      });
+      return false;
+    }
+  },
+
+  createMemberUser: async (data: CreateFamilyMemberUserData) => {
+    const active = get().activeFamily;
+    if (!active) return false;
+
+    set({ isLoading: true, error: null });
+    try {
+      const updated = await familyRepository.createMemberUser(active.id, data);
+      set({ activeFamily: updated, isLoading: false });
+      return true;
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { message?: string } } };
+      set({
+        error: axiosErr.response?.data?.message || 'No se pudo crear la cuenta del familiar.',
         isLoading: false,
       });
       return false;

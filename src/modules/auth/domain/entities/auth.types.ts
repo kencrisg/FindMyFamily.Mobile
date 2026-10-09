@@ -1,9 +1,13 @@
+import { UserFamilyMembership } from '../../../profile/domain/entities/user-profile.types';
+
 export interface AuthUser {
   id: string;
   firstName: string;
   lastName: string;
   phoneNumber: string;
   role: string;
+  systemRole?: 'admin' | 'user';
+  families?: UserFamilyMembership[];
 }
 
 export interface DeviceInfo {

@@ -2,6 +2,7 @@ import { apiClient } from '../../../shared/infrastructure/api/api-client';
 import {
   AddFamilyMemberData,
   CreateFamilyData,
+  CreateFamilyMemberUserData,
   Family,
   FamilyDetail,
 } from '../domain/entities/family.types';
@@ -24,6 +25,14 @@ export class FamilyApiRepository implements IFamilyRepository {
   }
 
   async addMember(familyId: string, data: AddFamilyMemberData): Promise<FamilyDetail> {
+    const response = await apiClient.post<FamilyDetail>(
+      `/api/families/${familyId}/members/link`,
+      data
+    );
+    return response.data;
+  }
+
+  async createMemberUser(familyId: string, data: CreateFamilyMemberUserData): Promise<FamilyDetail> {
     const response = await apiClient.post<FamilyDetail>(
       `/api/families/${familyId}/members`,
       data

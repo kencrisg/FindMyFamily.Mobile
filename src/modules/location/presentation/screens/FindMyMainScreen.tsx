@@ -33,7 +33,7 @@ export const FindMyMainScreen: React.FC = () => {
   const router = useRouter();
   const bottomSheetRef = useRef<BottomSheet>(null);
 
-  const { logout } = useAuthStore();
+  const { logout, isFamilyAdmin } = useAuthStore();
   const {
     families,
     activeFamily,
@@ -41,8 +41,11 @@ export const FindMyMainScreen: React.FC = () => {
     isLoading: familyLoading,
     fetchFamilies,
     addMember,
+    createMemberUser,
     setSelectedMember,
   } = useFamilyStore();
+
+  const canManageMembers = activeFamily ? isFamilyAdmin(activeFamily.id) : false;
 
   const {
     locations,
@@ -142,13 +145,15 @@ export const FindMyMainScreen: React.FC = () => {
                 >
                   <RefreshCw size={18} color={Colors.textPrimary} />
                 </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.actionIconBtn, styles.addIconBtn]}
-                  onPress={() => setIsAddModalVisible(true)}
-                  activeOpacity={0.7}
-                >
-                  <Plus size={20} color={Colors.textPrimary} />
-                </TouchableOpacity>
+                {canManageMembers && (
+                  <TouchableOpacity
+                    style={[styles.actionIconBtn, styles.addIconBtn]}
+                    onPress={() => setIsAddModalVisible(true)}
+                    activeOpacity={0.7}
+                  >
+                    <Plus size={20} color={Colors.textPrimary} />
+                  </TouchableOpacity>
+                )}
               </View>
             )}
           </View>
@@ -256,7 +261,7 @@ export const FindMyMainScreen: React.FC = () => {
       <AddMemberModal
         visible={isAddModalVisible}
         onClose={() => setIsAddModalVisible(false)}
-        onAdd={addMember}
+        onCreateMember={createMemberUser}
         isLoading={familyLoading}
       />
     </View>

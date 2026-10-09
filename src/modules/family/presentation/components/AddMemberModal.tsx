@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
 } from 'react-native';
 import { X, UserPlus } from 'lucide-react-native';
 import { CustomInput } from '../../../../shared/presentation/components/CustomInput';
@@ -17,32 +18,67 @@ import { Typography, Spacing } from '../../../../shared/theme/typography';
 interface AddMemberModalProps {
   visible: boolean;
   onClose: () => void;
-  onAdd: (phoneNumber: string) => Promise<boolean>;
+  onCreateMember: (data: {
+    firstName: string;
+    lastName: string;
+    phoneNumber: string;
+    password: string;
+  }) => Promise<boolean>;
   isLoading?: boolean;
 }
 
 export const AddMemberModal: React.FC<AddMemberModalProps> = ({
   visible,
   onClose,
-  onAdd,
+  onCreateMember,
   isLoading = false,
 }) => {
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
-  const handleAdd = async () => {
+  const resetForm = () => {
+    setFirstName('');
+    setLastName('');
+    setPhoneNumber('');
+    setPassword('');
     setError('');
+  };
+
+  const handleSubmit = async () => {
+    setError('');
+
+    if (!firstName.trim()) {
+      setError('El nombre es obligatorio.');
+      return;
+    }
+    if (!lastName.trim()) {
+      setError('El apellido es obligatorio.');
+      return;
+    }
     if (!phoneNumber.trim()) {
-      setError('Ingresa el número de teléfono del familiar.');
+      setError('El número de teléfono es obligatorio.');
+      return;
+    }
+    if (password.length < 6) {
+      setError('La contraseña debe tener al menos 6 caracteres.');
       return;
     }
 
-    const success = await onAdd(phoneNumber.trim());
+    const success = await onCreateMember({
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+      phoneNumber: phoneNumber.trim(),
+      password: password.trim(),
+    });
+
     if (success) {
-      setPhoneNumber('');
+      resetForm();
       onClose();
     } else {
-      setError('No se pudo encontrar o agregar a este usuario.');
+      setError('No se pudo crear la cuenta del familiar. Verifica los datos.');
     }
   };
 
@@ -58,7 +94,7 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
           <View style={styles.header}>
             <View style={styles.headerTitleRow}>
               <UserPlus size={24} color={Colors.primary} />
-              <Text style={styles.title}>Invitar a Familiar</Text>
+              <Text style={styles.title}>Registrar Familiar</Text>
             </View>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn} activeOpacity={0.7}>
               <X size={20} color={Colors.textSecondary} />
@@ -66,29 +102,62 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
           </View>
 
           <Text style={styles.description}>
-            Ingresa el número de teléfono con el que tu familiar se registró en la app.
+            Crea la cuenta de acceso para tu familiar dentro de tu grupo. Podrá iniciar sesión en la app con este teléfono y contraseña.
           </Text>
 
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-          <CustomInput
-            label="Número de Teléfono"
-            placeholder="Ej: +525512345678"
-            value={phoneNumber}
-            onChangeText={(text) => {
-              setPhoneNumber(text);
-              setError('');
-            }}
-            keyboardType="phone-pad"
-            autoComplete="tel"
-          />
+          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            <CustomInput
+              label="Nombre"
+              placeholder="Ej: Juan"
+              value={firstName}
+              onChangeText={(text) => {
+                setFirstName(text);
+                setError('');
+              }}
+            />
 
-          <BigButton
-            title="Agregar al Círculo"
-            onPress={handleAdd}
-            loading={isLoading}
-            style={styles.submitBtn}
-          />
+            <CustomInput
+              label="Apellido"
+              placeholder="Ej: Pérez"
+              value={lastName}
+              onChangeText={(text) => {
+                setLastName(text);
+                setError('');
+              }}
+            />
+
+            <CustomInput
+              label="Número de Teléfono"
+              placeholder="Ej: 0981234567"
+              value={phoneNumber}
+              onChangeText={(text) => {
+                setPhoneNumber(text);
+                setError('');
+              }}
+              keyboardType="phone-pad"
+              autoComplete="tel"
+            />
+
+            <CustomInput
+              label="Contraseña Temporal"
+              placeholder="Mínimo 6 caracteres"
+              value={password}
+              onChangeText={(text) => {
+                setPassword(text);
+                setError('');
+              }}
+              isPassword
+            />
+
+            <BigButton
+              title="Crear y Agregar a la Familia"
+              onPress={handleSubmit}
+              loading={isLoading}
+              style={styles.submitBtn}
+            />
+          </ScrollView>
         </View>
       </KeyboardAvoidingView>
     </Modal>
@@ -109,6 +178,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: Spacing.borderRadiusLg,
     borderTopRightRadius: Spacing.borderRadiusLg,
     padding: Spacing.xl,
+    maxHeight: '85%',
     paddingBottom: Platform.OS === 'ios' ? 40 : Spacing.xl,
     shadowColor: Colors.shadowElevated,
     shadowOffset: { width: 0, height: -4 },
@@ -142,8 +212,8 @@ const styles = StyleSheet.create({
   description: {
     ...Typography.body,
     color: Colors.textSecondary,
-    marginBottom: Spacing.lg,
-    fontSize: 15,
+    marginBottom: Spacing.md,
+    fontSize: 14,
   },
   errorText: {
     ...Typography.callout,
@@ -153,5 +223,6 @@ const styles = StyleSheet.create({
   },
   submitBtn: {
     marginTop: Spacing.sm,
+    marginBottom: Spacing.lg,
   },
 });
