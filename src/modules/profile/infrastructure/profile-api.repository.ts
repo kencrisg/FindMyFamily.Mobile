@@ -13,12 +13,12 @@ export class ProfileApiRepository implements IProfileRepository {
   }
 
   async updatePhone(data: UpdatePhoneRequest): Promise<UserProfile> {
-    const response = await apiClient.put<UserProfile>('/api/users/me/phone', data);
+    const response = await apiClient.patch<UserProfile>('/api/users/me/phone', data);
     return response.data;
   }
 
   async updatePassword(data: UpdatePasswordRequest): Promise<void> {
-    await apiClient.put('/api/users/me/password', data);
+    await apiClient.patch('/api/users/me/password', data);
   }
 }
 

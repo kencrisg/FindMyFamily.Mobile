@@ -36,7 +36,7 @@ export class FamilyApiRepository implements IFamilyRepository {
   }
 
   async updateMemberRole(familyId: string, userId: string, role: string): Promise<void> {
-    await apiClient.put(`/api/families/${familyId}/members/${userId}/role`, { role });
+    await apiClient.patch(`/api/families/${familyId}/members/${userId}/role`, { role });
   }
 }
 
