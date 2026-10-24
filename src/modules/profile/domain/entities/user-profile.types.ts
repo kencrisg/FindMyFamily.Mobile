@@ -19,7 +19,8 @@ export interface UserProfile {
 
 export interface UpdatePhoneRequest {
   newPhoneNumber: string;
-  passwordConfirmation: string;
+  /** Nombre exacto que espera `UpdatePhoneRequestDto` en el backend. */
+  password: string;
 }
 
 export interface UpdatePasswordRequest {

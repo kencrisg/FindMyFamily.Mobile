@@ -1,8 +1,9 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { Radio, X, CheckCircle, AlertCircle, Clock } from 'lucide-react-native';
+import { Radio, X, CheckCircle, AlertCircle, Clock, WifiOff } from 'lucide-react-native';
 import { FamilyMemberSummary } from '../../../family/domain/entities/family.types';
 import { LocationCoordinate } from '../../domain/entities/location.types';
+import { MemberRequestState } from '../../application/location.store';
 import { BigButton } from '../../../../shared/presentation/components/BigButton';
 import { Colors } from '../../../../shared/theme/colors';
 import { Typography, Spacing } from '../../../../shared/theme/typography';
@@ -11,8 +12,7 @@ interface RequestLocationActionProps {
   member: FamilyMemberSummary;
   familyId: string;
   location?: LocationCoordinate | null;
-  isRequesting: boolean;
-  requestMessage: string | null;
+  requestState: MemberRequestState;
   error: string | null;
   onRequestLocation: () => void;
   onDeselect: () => void;
@@ -21,12 +21,13 @@ interface RequestLocationActionProps {
 export const RequestLocationAction: React.FC<RequestLocationActionProps> = ({
   member,
   location,
-  isRequesting,
-  requestMessage,
+  requestState,
   error,
   onRequestLocation,
   onDeselect,
 }) => {
+  const esperando = requestState.status === 'waiting';
+
   const formatTime = (iso?: string) => {
     if (!iso) return 'Sin registros recientes';
     const date = new Date(iso);
@@ -53,10 +54,19 @@ export const RequestLocationAction: React.FC<RequestLocationActionProps> = ({
       </View>
 
       {/* Status Feedback Banners */}
-      {requestMessage ? (
+      {requestState.status === 'waiting' && requestState.message ? (
         <View style={styles.messageBanner}>
           <CheckCircle size={18} color={Colors.secondary} />
-          <Text style={styles.messageText}>{requestMessage}</Text>
+          <Text style={styles.messageText}>{requestState.message}</Text>
+        </View>
+      ) : null}
+
+      {/* Familiar inalcanzable: se muestra el motivo junto a la hora de su última
+          ubicación conocida, que es lo que sigue pintado en el mapa. */}
+      {requestState.status === 'unavailable' && requestState.message ? (
+        <View style={styles.unavailableBanner}>
+          <WifiOff size={18} color={Colors.warning} />
+          <Text style={styles.unavailableText}>{requestState.message}</Text>
         </View>
       ) : null}
 
@@ -69,10 +79,10 @@ export const RequestLocationAction: React.FC<RequestLocationActionProps> = ({
 
       {/* Prominent On-Demand Action Button */}
       <BigButton
-        title={isRequesting ? 'Despertando GPS...' : 'Solicitar Ubicación en Vivo'}
+        title={esperando ? 'Esperando respuesta…' : 'Solicitar Ubicación en Vivo'}
         icon={<Radio size={22} color={Colors.textInverse} />}
         onPress={onRequestLocation}
-        loading={isRequesting}
+        loading={esperando}
         style={styles.actionBtn}
       />
     </View>
@@ -115,6 +125,20 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surfaceMuted,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  unavailableBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    backgroundColor: 'rgba(255, 149, 0, 0.12)',
+    padding: Spacing.md,
+    borderRadius: Spacing.borderRadiusMd,
+    marginBottom: Spacing.md,
+  },
+  unavailableText: {
+    ...Typography.callout,
+    color: Colors.textPrimary,
+    flex: 1,
   },
   messageBanner: {
     flexDirection: 'row',

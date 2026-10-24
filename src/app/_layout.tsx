@@ -4,6 +4,11 @@ import { Slot, useRouter, useSegments } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StatusBar } from 'expo-status-bar';
 import { useAuthStore } from '../modules/auth/application/auth.store';
+
+// Importado por su efecto secundario: registra la tarea que atiende el Silent Push.
+// `TaskManager.defineTask` debe ejecutarse al cargar el bundle, porque cuando el sistema
+// despierta la app en segundo plano espera encontrar la tarea ya definida.
+import '../modules/location/infrastructure/location-request.task';
 import { Colors } from '../shared/theme/colors';
 
 export default function RootLayout() {

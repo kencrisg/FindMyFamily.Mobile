@@ -13,7 +13,6 @@ export interface AuthUser {
 export interface DeviceInfo {
   id: string;
   deviceModel?: string;
-  fcmToken?: string;
   isActive: boolean;
 }
 
@@ -26,17 +25,22 @@ export interface AuthTokens {
 export interface LoginCredentials {
   phoneNumber: string;
   password: string;
+  /** Identificador estable de esta instalación; lo resuelve el repositorio. */
+  installationId?: string;
   deviceModel?: string;
   fcmToken?: string;
 }
 
-export interface RegisterData {
-  firstName: string;
-  lastName: string;
-  phoneNumber: string;
-  password: string;
+export interface RefreshTokenPayload {
+  refreshToken: string;
+  installationId?: string;
   deviceModel?: string;
   fcmToken?: string;
+}
+
+export interface LogoutPayload {
+  refreshToken?: string;
+  allDevices?: boolean;
 }
 
 export interface AuthResponse {

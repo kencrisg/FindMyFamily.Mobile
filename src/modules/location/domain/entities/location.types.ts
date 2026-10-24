@@ -7,11 +7,17 @@ export interface LocationCoordinate {
   accuracy?: number;
 }
 
+/** Estados que devuelve POST /api/locations/request. */
+export type LocationRequestStatus = 'REQUESTED' | 'UNAVAILABLE';
+
 export interface LocationRequestResponse {
-  requestId: string;
+  /** null cuando el familiar es inalcanzable: no se llegó a crear ninguna petición. */
+  requestId: string | null;
   targetUserId: string;
-  status: string;
+  status: LocationRequestStatus;
   message: string;
+  /** Última posición conocida. Es lo que se pinta cuando el familiar está offline. */
+  lastKnownLocation: LocationCoordinate | null;
 }
 
 export interface ReportLocationPayload {

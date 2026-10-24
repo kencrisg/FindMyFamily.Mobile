@@ -1,7 +1,13 @@
-import { AuthResponse, AuthTokens, LoginCredentials, RegisterData } from '../entities/auth.types';
+import {
+  AuthResponse,
+  AuthTokens,
+  LoginCredentials,
+  LogoutPayload,
+  RefreshTokenPayload,
+} from '../entities/auth.types';
 
 export interface IAuthRepository {
   login(credentials: LoginCredentials): Promise<AuthResponse>;
-  register(data: RegisterData): Promise<AuthResponse>;
-  refreshToken(tokens: AuthTokens): Promise<AuthTokens>;
+  refreshToken(payload: RefreshTokenPayload): Promise<AuthTokens>;
+  logout(payload: LogoutPayload): Promise<void>;
 }

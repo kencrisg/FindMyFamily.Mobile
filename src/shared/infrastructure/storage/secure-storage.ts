@@ -3,6 +3,7 @@ import * as SecureStore from 'expo-secure-store';
 const ACCESS_TOKEN_KEY = 'fmf_access_token';
 const REFRESH_TOKEN_KEY = 'fmf_refresh_token';
 const USER_KEY = 'fmf_user_data';
+const INSTALLATION_ID_KEY = 'fmf_installation_id';
 
 export interface StoredTokens {
   accessToken: string;
@@ -50,6 +51,33 @@ export class SecureStorageService {
     }
   }
 
+  /**
+   * Identificador estable de esta instalación de la app. Se genera una sola vez y
+   * sobrevive a los cierres de sesión, porque identifica al dispositivo y no al usuario.
+   *
+   * Es necesario porque el backend distinguía los dispositivos por su modelo, y el
+   * cliente enviaba una constante por plataforma ('Apple iPhone'): dos teléfonos del
+   * mismo usuario colapsaban en un único registro y se invalidaban la sesión mutuamente.
+   */
+  static async getInstallationId(): Promise<string> {
+    try {
+      const existing = await SecureStore.getItemAsync(INSTALLATION_ID_KEY);
+      if (existing) {
+        return existing;
+      }
+
+      const generated = generateInstallationId();
+      await SecureStore.setItemAsync(INSTALLATION_ID_KEY, generated);
+      return generated;
+    } catch (error) {
+      console.error('Error resolving installation id:', error);
+      // Si el almacenamiento seguro falla, se devuelve un valor efímero: peor que
+      // persistirlo, pero mejor que enviar un identificador compartido entre dispositivos.
+      return generateInstallationId();
+    }
+  }
+
+  /** Borra la sesión. El installation id se conserva: el dispositivo sigue siendo el mismo. */
   static async clearAll(): Promise<void> {
     try {
       await SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY);
@@ -59,4 +87,9 @@ export class SecureStorageService {
       console.error('Error clearing SecureStore:', error);
     }
   }
+}
+
+function generateInstallationId(): string {
+  const randomPart = () => Math.random().toString(36).slice(2, 10);
+  return `${Date.now().toString(36)}-${randomPart()}-${randomPart()}`;
 }

@@ -49,17 +49,22 @@ export const FindMyMainScreen: React.FC = () => {
 
   const {
     locations,
-    isRequesting,
-    requestMessage,
     error: locationError,
     requestLocation,
+    getRequestState,
+    cancelRequest,
     startSignalR,
     stopSignalR,
     clearStatus,
   } = useLocationStore();
 
+  // Suscripción al mapa de peticiones para que la pantalla se repinte cuando el
+  // temporizador marque a un familiar como no disponible.
+  const requests = useLocationStore((state) => state.requests);
+
   const [activeTab, setActiveTab] = useState<TabType>('people');
   const [isAddModalVisible, setIsAddModalVisible] = useState(false);
+  const [permissionWarning, setPermissionWarning] = useState<string | null>(null);
 
   // Snap points for the Apple Find My bottom sheet
   const snapPoints = useMemo(() => ['18%', '45%', '85%'], []);
@@ -68,8 +73,21 @@ export const FindMyMainScreen: React.FC = () => {
     // 1. Fetch initial families & members
     fetchFamilies();
 
-    // 2. Request permissions
-    BackgroundTaskManager.requestPermissions();
+    // 2. Request permissions. El resultado se muestra: antes se descartaba y el usuario
+    //    no sabía que su teléfono no podría responder a las peticiones de la familia.
+    BackgroundTaskManager.requestPermissions().then((permissions) => {
+      if (!permissions.foreground) {
+        setPermissionWarning(
+          'Sin permiso de ubicación, tu familia no podrá localizarte. Actívalo en los ajustes del teléfono.'
+        );
+      } else if (!permissions.background) {
+        setPermissionWarning(
+          'Falta el permiso de ubicación en segundo plano: solo podrás compartir tu ubicación con la app abierta.'
+        );
+      } else {
+        setPermissionWarning(null);
+      }
+    });
 
     // 3. Connect to SignalR real-time hub
     startSignalR();
@@ -158,6 +176,13 @@ export const FindMyMainScreen: React.FC = () => {
             )}
           </View>
 
+          {/* Aviso de permisos insuficientes */}
+          {permissionWarning && activeTab === 'me' ? (
+            <View style={styles.permissionBanner}>
+              <Text style={styles.permissionBannerText}>{permissionWarning}</Text>
+            </View>
+          ) : null}
+
           {/* Content Body */}
           <View style={styles.body}>
             {activeTab === 'people' ? (
@@ -166,11 +191,11 @@ export const FindMyMainScreen: React.FC = () => {
                   member={selectedMember}
                   familyId={activeFamily.id}
                   location={locations[selectedMember.userId]}
-                  isRequesting={isRequesting}
-                  requestMessage={requestMessage}
+                  requestState={requests[selectedMember.userId] ?? getRequestState(selectedMember.userId)}
                   error={locationError}
                   onRequestLocation={handleRequestLocation}
                   onDeselect={() => {
+                    cancelRequest(selectedMember.userId);
                     setSelectedMember(null);
                     clearStatus();
                   }}
@@ -333,6 +358,17 @@ const styles = StyleSheet.create({
   },
   body: {
     flex: 1,
+  },
+  permissionBanner: {
+    marginHorizontal: Spacing.lg,
+    marginBottom: Spacing.sm,
+    padding: Spacing.md,
+    borderRadius: Spacing.borderRadiusMd,
+    backgroundColor: 'rgba(255, 149, 0, 0.12)',
+  },
+  permissionBannerText: {
+    ...Typography.footnote,
+    color: Colors.textPrimary,
   },
   listContent: {
     paddingHorizontal: Spacing.sm,

@@ -3,6 +3,13 @@ import { API_BASE_URL } from '../../../shared/infrastructure/api/api-client';
 import { SecureStorageService } from '../../../shared/infrastructure/storage/secure-storage';
 import { LocationCoordinate } from '../domain/entities/location.types';
 
+/**
+ * Nombre del evento que emite el backend (`SignalRLocationNotifier`). Debe coincidir
+ * exactamente: el cliente escuchaba 'LocationReported' mientras el servidor emitía
+ * 'LocationUpdated', de modo que ninguna actualización en tiempo real llegaba nunca.
+ */
+const LOCATION_UPDATED_EVENT = 'LocationUpdated';
+
 export class SignalRLocationService {
   private connection: signalR.HubConnection | null = null;
   private onLocationReportedCallback: ((location: LocationCoordinate) => void) | null = null;
@@ -27,8 +34,8 @@ export class SignalRLocationService {
       .configureLogging(signalR.LogLevel.Warning)
       .build();
 
-    // Listen for backend real-time broadcast: LocationReported
-    this.connection.on('LocationReported', (data: {
+    // Listen for backend real-time broadcast
+    this.connection.on(LOCATION_UPDATED_EVENT, (data: {
       id: string;
       userId: string;
       latitude: number;
