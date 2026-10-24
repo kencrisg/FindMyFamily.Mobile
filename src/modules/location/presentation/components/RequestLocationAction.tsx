@@ -7,6 +7,7 @@ import { MemberRequestState } from '../../application/location.store';
 import { BigButton } from '../../../../shared/presentation/components/BigButton';
 import { Colors } from '../../../../shared/theme/colors';
 import { Typography, Spacing } from '../../../../shared/theme/typography';
+import { formatRelativeTime } from '../../../../shared/presentation/utils/format-relative-time';
 
 interface RequestLocationActionProps {
   member: FamilyMemberSummary;
@@ -29,9 +30,8 @@ export const RequestLocationAction: React.FC<RequestLocationActionProps> = ({
   const esperando = requestState.status === 'waiting';
 
   const formatTime = (iso?: string) => {
-    if (!iso) return 'Sin registros recientes';
-    const date = new Date(iso);
-    return `Último reporte: ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+    if (!iso) return 'Sin ubicaciones registradas';
+    return `Última ubicación ${formatRelativeTime(iso)}`;
   };
 
   return (

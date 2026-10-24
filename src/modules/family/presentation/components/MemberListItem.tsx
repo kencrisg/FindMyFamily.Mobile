@@ -5,6 +5,7 @@ import { FamilyMemberSummary } from '../../domain/entities/family.types';
 import { LocationCoordinate } from '../../../location/domain/entities/location.types';
 import { Colors } from '../../../../shared/theme/colors';
 import { Typography, Spacing } from '../../../../shared/theme/typography';
+import { formatRelativeTime } from '../../../../shared/presentation/utils/format-relative-time';
 
 interface MemberListItemProps {
   member: FamilyMemberSummary;
@@ -20,19 +21,6 @@ export const MemberListItem: React.FC<MemberListItemProps> = ({
   onPress,
 }) => {
   const initials = `${member.firstName.charAt(0)}${member.lastName.charAt(0)}`.toUpperCase();
-
-  const formatRelativeTime = (timestamp?: string) => {
-    if (!timestamp) return 'Sin ubicación reciente';
-    const date = new Date(timestamp);
-    const now = new Date();
-    const diffMins = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
-
-    if (diffMins < 1) return 'Ahora mismo';
-    if (diffMins < 60) return `Hace ${diffMins} min`;
-    const diffHours = Math.floor(diffMins / 60);
-    if (diffHours < 24) return `Hace ${diffHours} h`;
-    return date.toLocaleDateString();
-  };
 
   return (
     <TouchableOpacity
@@ -61,7 +49,7 @@ export const MemberListItem: React.FC<MemberListItemProps> = ({
         </View>
 
         <Text style={styles.subtitle} numberOfLines={1}>
-          {location ? `Ubicación reportada • ${formatRelativeTime(location.capturedAt)}` : 'Toca para solicitar ubicación'}
+          {location ? `Última ubicación • ${formatRelativeTime(location.capturedAt)}` : 'Toca para solicitar ubicación'}
         </Text>
       </View>
 

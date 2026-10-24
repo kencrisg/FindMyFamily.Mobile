@@ -31,16 +31,6 @@ export class LocationApiRepository implements ILocationRepository {
     }
   }
 
-  async getLocationHistory(
-    familyId: string,
-    userId: string,
-    limit = 50
-  ): Promise<LocationCoordinate[]> {
-    const response = await apiClient.get<LocationCoordinate[]>(
-      `/api/locations/families/${familyId}/users/${userId}/history?limit=${limit}`
-    );
-    return response.data;
-  }
 }
 
 export const locationRepository = new LocationApiRepository();

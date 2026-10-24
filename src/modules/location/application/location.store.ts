@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { locationRepository } from '../infrastructure/location-api.repository';
 import { signalRLocationService } from '../infrastructure/signalr-location.service';
 import { LocationCoordinate } from '../domain/entities/location.types';
+import { formatRelativeTime } from '../../../shared/presentation/utils/format-relative-time';
 
 /**
  * Tiempo que se espera la respuesta de un familiar tras enviarle el Silent Push.
@@ -57,18 +58,16 @@ const clearTimer = (userId: string) => {
   }
 };
 
-/** Texto de "no disponible" acompañado de la hora de su última ubicación conocida. */
+/**
+ * Texto de "no disponible" con el tiempo transcurrido desde su última ubicación válida.
+ * Saber que estuvo ahí "hace 40 min" es la información útil cuando no contesta.
+ */
 const buildUnavailableMessage = (last: LocationCoordinate | undefined): string => {
   if (!last) {
     return 'Tu familiar no está disponible y todavía no hay ninguna ubicación registrada suya.';
   }
 
-  const fecha = new Date(last.capturedAt);
-  const hora = fecha.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  const hoy = new Date().toDateString() === fecha.toDateString();
-  const cuando = hoy ? `hoy a las ${hora}` : `el ${fecha.toLocaleDateString()} a las ${hora}`;
-
-  return `Tu familiar no está disponible. Su última ubicación conocida es de ${cuando}.`;
+  return `Tu familiar no está disponible. Esta fue su última ubicación ${formatRelativeTime(last.capturedAt)}.`;
 };
 
 export const useLocationStore = create<LocationState>((set, get) => ({
