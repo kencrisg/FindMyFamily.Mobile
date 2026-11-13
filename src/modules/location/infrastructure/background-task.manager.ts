@@ -1,4 +1,5 @@
 import * as Location from 'expo-location';
+import { capturePosition } from './position-capture';
 import { locationRepository } from './location-api.repository';
 
 export interface LocationPermissionState {
@@ -42,9 +43,14 @@ export class BackgroundTaskManager {
         return false;
       }
 
-      const location = await Location.getCurrentPositionAsync({
+      const location = await capturePosition({
         accuracy: Location.Accuracy.High,
+        timeoutMs: 15_000,
+        maxLastKnownAgeMs: 15 * 60_000,
       });
+      if (!location) {
+        return false;
+      }
 
       await locationRepository.reportLocation({
         latitude: location.coords.latitude,

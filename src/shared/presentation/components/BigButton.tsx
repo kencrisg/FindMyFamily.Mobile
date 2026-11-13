@@ -1,13 +1,6 @@
 import React from 'react';
-import {
-  TouchableOpacity,
-  Text,
-  StyleSheet,
-  ActivityIndicator,
-  ViewStyle,
-  TextStyle,
-} from 'react-native';
-import { Colors } from '../../theme/colors';
+import { TouchableOpacity, Text, ActivityIndicator, ViewStyle, TextStyle } from 'react-native';
+import { makeStyles, useTheme } from '../../theme/use-theme';
 import { Typography, Spacing } from '../../theme/typography';
 
 interface BigButtonProps {
@@ -31,29 +24,31 @@ export const BigButton: React.FC<BigButtonProps> = ({
   style,
   textStyle,
 }) => {
+  const styles = useStyles();
+  const { colors } = useTheme();
   const getBackgroundColor = () => {
-    if (disabled) return Colors.surfaceMuted;
+    if (disabled) return colors.surfaceMuted;
     switch (variant) {
       case 'primary':
-        return Colors.primary;
+        return colors.primary;
       case 'secondary':
-        return Colors.secondary;
+        return colors.secondary;
       case 'danger':
-        return Colors.danger;
+        return colors.danger;
       case 'ghost':
         return 'transparent';
       default:
-        return Colors.primary;
+        return colors.primary;
     }
   };
 
   const getTextColor = () => {
-    if (disabled) return Colors.textTertiary;
+    if (disabled) return colors.textTertiary;
     switch (variant) {
       case 'ghost':
-        return Colors.primary;
+        return colors.primary;
       default:
-        return Colors.textInverse;
+        return colors.textInverse;
     }
   };
 
@@ -83,7 +78,7 @@ export const BigButton: React.FC<BigButtonProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   button: {
     height: Spacing.buttonHeight,
     borderRadius: Spacing.borderRadiusMd,
@@ -92,7 +87,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: Spacing.xl,
     gap: Spacing.sm,
-    shadowColor: Colors.shadow,
+    shadowColor: colors.shadow,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
     shadowRadius: 8,
@@ -100,7 +95,7 @@ const styles = StyleSheet.create({
   },
   ghostBorder: {
     borderWidth: 1.5,
-    borderColor: Colors.primary,
+    borderColor: colors.primary,
     shadowOpacity: 0,
     elevation: 0,
   },
@@ -109,4 +104,4 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
   },
-});
+}));

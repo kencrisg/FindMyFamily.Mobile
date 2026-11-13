@@ -8,7 +8,8 @@ export interface LocationCoordinate {
 }
 
 /** Estados que devuelve POST /api/locations/request. */
-export type LocationRequestStatus = 'REQUESTED' | 'UNAVAILABLE';
+/** `SHARING_DISABLED`: el familiar desactivó la opción de compartir su ubicación. */
+export type LocationRequestStatus = 'REQUESTED' | 'UNAVAILABLE' | 'SHARING_DISABLED';
 
 export interface LocationRequestResponse {
   /** null cuando el familiar es inalcanzable: no se llegó a crear ninguna petición. */

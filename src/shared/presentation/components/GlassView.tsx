@@ -1,24 +1,28 @@
 import React from 'react';
-import { StyleSheet, View, ViewProps, Platform } from 'react-native';
+import { View, ViewProps, Platform } from 'react-native';
 import { BlurView } from 'expo-blur';
-import { Colors } from '../../theme/colors';
+import { makeStyles, useTheme } from '../../theme/use-theme';
 
 interface GlassViewProps extends ViewProps {
   intensity?: number;
-  tint?: 'light' | 'dark' | 'default' | 'systemThinMaterialLight';
+  /** Si se omite, sigue el tema: material claro u oscuro. */
+  tint?: 'light' | 'dark' | 'default' | 'systemThinMaterialLight' | 'systemThinMaterialDark';
   children: React.ReactNode;
 }
 
 export const GlassView: React.FC<GlassViewProps> = ({
   intensity = 80,
-  tint = 'systemThinMaterialLight',
+  tint,
   style,
   children,
   ...rest
 }) => {
+  const styles = useStyles();
+  const { isDark } = useTheme();
+  const resolvedTint = tint ?? (isDark ? 'systemThinMaterialDark' : 'systemThinMaterialLight');
   if (Platform.OS === 'ios') {
     return (
-      <BlurView intensity={intensity} tint={tint} style={[styles.blur, style]} {...rest}>
+      <BlurView intensity={intensity} tint={resolvedTint} style={[styles.blur, style]} {...rest}>
         {children}
       </BlurView>
     );
@@ -32,19 +36,19 @@ export const GlassView: React.FC<GlassViewProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   blur: {
     overflow: 'hidden',
-    backgroundColor: 'rgba(255, 255, 255, 0.75)',
+    backgroundColor: colors.cardBackgroundGlass,
   },
   androidGlass: {
-    backgroundColor: 'rgba(255, 255, 255, 0.94)',
-    borderColor: Colors.borderSubtle,
+    backgroundColor: colors.sheetBackground,
+    borderColor: colors.borderSubtle,
     borderWidth: 1,
     elevation: 8,
-    shadowColor: Colors.shadowElevated,
+    shadowColor: colors.shadowElevated,
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.1,
     shadowRadius: 12,
   },
-});
+}));

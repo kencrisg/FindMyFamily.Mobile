@@ -12,9 +12,23 @@ const DEFAULT_DEV_HOST = Platform.select({
 
 export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || DEFAULT_DEV_HOST;
 
+// Por este canal viajan el token de sesión, las contraseñas y las coordenadas GPS de la
+// familia. En un build de producción eso NO puede ir en claro, así que se falla al arrancar
+// en lugar de funcionar "bien" enviándolo todo sin cifrar: un error visible aquí cuesta
+// cinco minutos, y una fuga silenciosa no se detecta nunca.
+// En desarrollo (`__DEV__`) se permite http para el emulador y la red local.
+if (!__DEV__ && !API_BASE_URL.startsWith('https://')) {
+  throw new Error(
+    `EXPO_PUBLIC_API_URL debe usar https:// en un build de producción (valor actual: "${API_BASE_URL}"). ` +
+      'Revisa el perfil de eas.json con el que construiste el APK.'
+  );
+}
+
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 15000,
+  // 30 s en lugar de 15: un backend en un plan gratuito que estaba dormido tarda hasta un
+  // minuto en despertar, y con 15 s la primera petición del día fallaba siempre.
+  timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -29,6 +43,28 @@ export const apiClient = axios.create({
  * `authenticated`, dejando la app en la pantalla principal sin credenciales.
  */
 type SessionExpiredHandler = () => void | Promise<void>;
+
+/**
+ * Error que indica que la sesión ya no es válida y se ha borrado del dispositivo.
+ * Permite a quien llama distinguirlo de un fallo de red o del servidor, en los que la
+ * sesión sigue siendo buena y basta con reintentar.
+ */
+export class SessionExpiredError extends Error {
+  constructor(message = 'La sesión ha expirado.') {
+    super(message);
+    this.name = 'SessionExpiredError';
+  }
+}
+
+/**
+ * true solo cuando el SERVIDOR rechazó el refresh token (400 vacío, 401 inválido o
+ * caducado, 403). Un timeout, un servidor caído, un 5xx o un 429 por límite de peticiones
+ * no dicen nada de la sesión: el token sigue siendo válido y no hay que borrarlo.
+ */
+const isRefreshRejected = (error: unknown): boolean => {
+  const status = axios.isAxiosError(error) ? error.response?.status : undefined;
+  return status === 400 || status === 401 || status === 403;
+};
 
 let onSessionExpired: SessionExpiredHandler | null = null;
 
@@ -108,7 +144,7 @@ apiClient.interceptors.response.use(
     try {
       const storedTokens = await SecureStorageService.getTokens();
       if (!storedTokens?.refreshToken) {
-        throw new Error('No refresh token available');
+        throw new SessionExpiredError('No hay refresh token guardado.');
       }
 
       const installationId = await SecureStorageService.getInstallationId();
@@ -134,7 +170,17 @@ apiClient.interceptors.response.use(
 
       return apiClient(originalRequest);
     } catch (refreshError) {
-      processQueue(refreshError as Error, null);
+      // Antes se borraba la sesión ante CUALQUIER fallo del refresh. Con un hosting gratuito
+      // que tarda en despertar, un simple timeout cerraba la sesión y obligaba a volver a
+      // escribir la contraseña. Ahora solo se borra si el servidor rechazó el token.
+      if (!(refreshError instanceof SessionExpiredError) && !isRefreshRejected(refreshError)) {
+        processQueue(refreshError as Error, null);
+        return Promise.reject(refreshError);
+      }
+
+      const expired =
+        refreshError instanceof SessionExpiredError ? refreshError : new SessionExpiredError();
+      processQueue(expired, null);
       await SecureStorageService.clearAll();
 
       // La sesión no es recuperable: hay que devolver al usuario al login.
@@ -142,7 +188,7 @@ apiClient.interceptors.response.use(
         await onSessionExpired();
       }
 
-      return Promise.reject(refreshError);
+      return Promise.reject(expired);
     } finally {
       isRefreshing = false;
     }

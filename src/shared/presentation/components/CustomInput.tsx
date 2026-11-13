@@ -1,14 +1,7 @@
 import React, { useState } from 'react';
-import {
-  View,
-  TextInput,
-  Text,
-  StyleSheet,
-  TextInputProps,
-  TouchableOpacity,
-} from 'react-native';
+import { View, TextInput, Text, TextInputProps, TouchableOpacity } from 'react-native';
 import { Eye, EyeOff } from 'lucide-react-native';
-import { Colors } from '../../theme/colors';
+import { makeStyles, useTheme } from '../../theme/use-theme';
 import { Typography, Spacing } from '../../theme/typography';
 
 interface CustomInputProps extends TextInputProps {
@@ -24,6 +17,8 @@ export const CustomInput: React.FC<CustomInputProps> = ({
   style,
   ...rest
 }) => {
+  const styles = useStyles();
+  const { colors } = useTheme();
   const [showPassword, setShowPassword] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
 
@@ -39,11 +34,17 @@ export const CustomInput: React.FC<CustomInputProps> = ({
       >
         <TextInput
           style={[styles.input, style]}
-          placeholderTextColor={Colors.textTertiary}
+          placeholderTextColor={colors.textTertiary}
           secureTextEntry={isPassword && !showPassword}
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
           autoCapitalize="none"
+          // En los campos de contraseña se desactivan el autocorrector y el diccionario:
+          // de lo contrario el teclado puede aprender y sugerir lo que se escribió,
+          // sobre todo mientras el usuario usa el ojo para mostrar la contraseña.
+          autoCorrect={isPassword ? false : rest.autoCorrect}
+          spellCheck={isPassword ? false : rest.spellCheck}
+          textContentType={isPassword ? 'password' : rest.textContentType}
           {...rest}
         />
         {isPassword && (
@@ -53,9 +54,9 @@ export const CustomInput: React.FC<CustomInputProps> = ({
             activeOpacity={0.7}
           >
             {showPassword ? (
-              <EyeOff size={22} color={Colors.textSecondary} />
+              <EyeOff size={22} color={colors.textSecondary} />
             ) : (
-              <Eye size={22} color={Colors.textSecondary} />
+              <Eye size={22} color={colors.textSecondary} />
             )}
           </TouchableOpacity>
         )}
@@ -65,48 +66,48 @@ export const CustomInput: React.FC<CustomInputProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   container: {
     marginBottom: Spacing.lg,
     width: '100%',
   },
   label: {
     ...Typography.subhead,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     fontWeight: '600',
     marginBottom: Spacing.xs,
     fontSize: 15,
   },
   inputWrapper: {
     height: Spacing.inputHeight,
-    backgroundColor: Colors.cardBackground,
+    backgroundColor: colors.cardBackground,
     borderRadius: Spacing.borderRadiusMd,
     borderWidth: 1.5,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: Spacing.lg,
   },
   focusedWrapper: {
-    borderColor: Colors.primary,
+    borderColor: colors.primary,
   },
   errorWrapper: {
-    borderColor: Colors.danger,
+    borderColor: colors.danger,
   },
   input: {
     flex: 1,
     height: '100%',
     ...Typography.body,
     fontSize: 17,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   eyeButton: {
     padding: Spacing.xs,
   },
   errorText: {
     ...Typography.caption,
-    color: Colors.danger,
+    color: colors.danger,
     marginTop: Spacing.xs,
     fontWeight: '600',
   },
-});
+}));

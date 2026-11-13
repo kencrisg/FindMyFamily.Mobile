@@ -1,12 +1,12 @@
 import { create } from 'zustand';
 import { familyRepository } from '../infrastructure/family-api.repository';
-import {
-  CreateFamilyMemberUserData,
-  Family,
-  FamilyDetail,
-  FamilyMemberSummary,
-} from '../domain/entities/family.types';
+import { Family, FamilyDetail, FamilyMemberSummary } from '../domain/entities/family.types';
+import { getApiErrorMessage } from '../../../shared/presentation/utils/api-error';
 
+/**
+ * Familia que se muestra en el mapa y miembro seleccionado. La gestión de miembros (crear,
+ * editar, quitar...) vive en `useFamilyManagement`, que avisa a este store tras cada cambio.
+ */
 interface FamilyState {
   families: Family[];
   activeFamily: FamilyDetail | null;
@@ -16,20 +16,22 @@ interface FamilyState {
 
   fetchFamilies: () => Promise<void>;
   selectFamily: (familyId: string) => Promise<void>;
-  createFamily: (name: string) => Promise<boolean>;
-  addMember: (phoneNumber: string) => Promise<boolean>;
-  createMemberUser: (data: CreateFamilyMemberUserData) => Promise<boolean>;
-  removeMember: (userId: string) => Promise<boolean>;
   setSelectedMember: (member: FamilyMemberSummary | null) => void;
+  /** Vacía el estado al cerrar sesión, para que la siguiente cuenta no vea la familia anterior. */
+  reset: () => void;
   clearError: () => void;
 }
 
-export const useFamilyStore = create<FamilyState>((set, get) => ({
+const INITIAL_STATE = {
   families: [],
   activeFamily: null,
   selectedMember: null,
   isLoading: false,
   error: null,
+};
+
+export const useFamilyStore = create<FamilyState>((set, get) => ({
+  ...INITIAL_STATE,
 
   fetchFamilies: async () => {
     set({ isLoading: true, error: null });
@@ -37,18 +39,19 @@ export const useFamilyStore = create<FamilyState>((set, get) => ({
       const families = await familyRepository.getMyFamilies();
       set({ families });
 
-      // Automatically select first family if available and none selected
-      if (families.length > 0) {
-        const currentActive = get().activeFamily;
-        const targetId = currentActive?.id || families[0].id;
-        await get().selectFamily(targetId);
-      } else {
+      if (families.length === 0) {
         set({ activeFamily: null, isLoading: false });
+        return;
       }
+
+      // Se conserva la familia activa si sigue existiendo; si no (p. ej. le sacaron de
+      // ella), se pasa a la primera.
+      const currentId = get().activeFamily?.id;
+      const targetId = families.some((f) => f.id === currentId) ? currentId! : families[0].id;
+      await get().selectFamily(targetId);
     } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { message?: string } } };
       set({
-        error: axiosErr.response?.data?.message || 'Error al cargar grupos familiares.',
+        error: getApiErrorMessage(err, 'Error al cargar grupos familiares.'),
         isLoading: false,
       });
     }
@@ -58,96 +61,27 @@ export const useFamilyStore = create<FamilyState>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const detail = await familyRepository.getFamilyById(familyId);
-      set({ activeFamily: detail, isLoading: false });
-    } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { message?: string } } };
+      const selected = get().selectedMember;
       set({
-        error: axiosErr.response?.data?.message || 'Error al cargar detalles de la familia.',
+        activeFamily: detail,
+        // Si el miembro seleccionado ya no está en la familia, se deselecciona.
+        selectedMember:
+          selected && detail.members.some((m) => m.userId === selected.userId) ? selected : null,
         isLoading: false,
       });
-    }
-  },
-
-  createFamily: async (name: string) => {
-    set({ isLoading: true, error: null });
-    try {
-      const newFamily = await familyRepository.createFamily({ name });
-      await get().fetchFamilies();
-      await get().selectFamily(newFamily.id);
-      return true;
     } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { message?: string } } };
       set({
-        error: axiosErr.response?.data?.message || 'Error al crear el grupo familiar.',
+        error: getApiErrorMessage(err, 'Error al cargar detalles de la familia.'),
         isLoading: false,
       });
-      return false;
-    }
-  },
-
-  addMember: async (phoneNumber: string) => {
-    const active = get().activeFamily;
-    if (!active) return false;
-
-    set({ isLoading: true, error: null });
-    try {
-      const updated = await familyRepository.addMember(active.id, { phoneNumber });
-      set({ activeFamily: updated, isLoading: false });
-      return true;
-    } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { message?: string } } };
-      set({
-        error: axiosErr.response?.data?.message || 'No se pudo agregar al familiar.',
-        isLoading: false,
-      });
-      return false;
-    }
-  },
-
-  createMemberUser: async (data: CreateFamilyMemberUserData) => {
-    const active = get().activeFamily;
-    if (!active) return false;
-
-    set({ isLoading: true, error: null });
-    try {
-      const updated = await familyRepository.createMemberUser(active.id, data);
-      set({ activeFamily: updated, isLoading: false });
-      return true;
-    } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { message?: string } } };
-      set({
-        error: axiosErr.response?.data?.message || 'No se pudo crear la cuenta del familiar.',
-        isLoading: false,
-      });
-      return false;
-    }
-  },
-
-  removeMember: async (userId: string) => {
-    const active = get().activeFamily;
-    if (!active) return false;
-
-    set({ isLoading: true, error: null });
-    try {
-      await familyRepository.removeMember(active.id, userId);
-      await get().selectFamily(active.id);
-      if (get().selectedMember?.userId === userId) {
-        set({ selectedMember: null });
-      }
-      return true;
-    } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { message?: string } } };
-      set({
-        error: axiosErr.response?.data?.message || 'Error al remover al miembro.',
-        isLoading: false,
-      });
-      return false;
     }
   },
 
   setSelectedMember: (member: FamilyMemberSummary | null) => {
     set({ selectedMember: member });
   },
+
+  reset: () => set(INITIAL_STATE),
 
   clearError: () => set({ error: null }),
 }));

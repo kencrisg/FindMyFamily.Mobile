@@ -8,6 +8,8 @@ export interface AuthUser {
   role: string;
   systemRole?: 'admin' | 'user';
   families?: UserFamilyMembership[];
+  /** false: ha dejado de compartir su ubicación. Si falta, se asume que comparte. */
+  locationSharingEnabled?: boolean;
 }
 
 export interface DeviceInfo {

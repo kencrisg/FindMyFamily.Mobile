@@ -1,4 +1,5 @@
 import {
+  UpdateMyProfileRequest,
   UpdatePasswordRequest,
   UpdatePhoneRequest,
   UserProfile,
@@ -6,6 +7,8 @@ import {
 
 export interface IProfileRepository {
   getMyProfile(): Promise<UserProfile>;
+  updateMyProfile(data: UpdateMyProfileRequest): Promise<UserProfile>;
+  setLocationSharing(enabled: boolean): Promise<UserProfile>;
   updatePhone(data: UpdatePhoneRequest): Promise<UserProfile>;
   updatePassword(data: UpdatePasswordRequest): Promise<void>;
 }

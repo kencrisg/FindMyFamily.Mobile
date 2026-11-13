@@ -1,13 +1,14 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { Radio, X, CheckCircle, AlertCircle, Clock, WifiOff } from 'lucide-react-native';
+import React, { useEffect } from 'react';
+import { View, Text, TouchableOpacity, BackHandler } from 'react-native';
+import { Radio, ChevronLeft, AlertCircle, MapPin } from 'lucide-react-native';
 import { FamilyMemberSummary } from '../../../family/domain/entities/family.types';
 import { LocationCoordinate } from '../../domain/entities/location.types';
 import { MemberRequestState } from '../../application/location.store';
 import { BigButton } from '../../../../shared/presentation/components/BigButton';
-import { Colors } from '../../../../shared/theme/colors';
+import { makeStyles, useTheme } from '../../../../shared/theme/use-theme';
 import { Typography, Spacing } from '../../../../shared/theme/typography';
-import { formatRelativeTime } from '../../../../shared/presentation/utils/format-relative-time';
+import { usePlaceName } from '../hooks/use-place-name';
+import { describeMemberLocation, useNow, StatusTone } from '../utils/member-location-status';
 
 interface RequestLocationActionProps {
   member: FamilyMemberSummary;
@@ -27,52 +28,64 @@ export const RequestLocationAction: React.FC<RequestLocationActionProps> = ({
   onRequestLocation,
   onDeselect,
 }) => {
+  const styles = useStyles();
+  const { colors } = useTheme();
   const esperando = requestState.status === 'waiting';
+  const now = useNow();
+  const place = usePlaceName(location);
+  const status = describeMemberLocation(location, requestState, now);
 
-  const formatTime = (iso?: string) => {
-    if (!iso) return 'Sin ubicaciones registradas';
-    return `Última ubicación ${formatRelativeTime(iso)}`;
+  const toneColor: Record<StatusTone, string> = {
+    live: colors.secondary,
+    warning: colors.warning,
+    active: colors.primary,
+    muted: colors.textSecondary,
   };
+
+  // El botón atrás de Android vuelve a la lista de familiares, igual que el enlace de arriba.
+  // Sin esto, pulsarlo en esta vista no regresaba a la lista.
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      onDeselect();
+      return true;
+    });
+    return () => subscription.remove();
+  }, [onDeselect]);
 
   return (
     <View style={styles.container}>
-      {/* Header with Close */}
+      <TouchableOpacity
+        onPress={onDeselect}
+        style={styles.backBtn}
+        activeOpacity={0.6}
+        accessibilityRole="button"
+        accessibilityLabel="Volver a la lista de familiares"
+        hitSlop={8}
+      >
+        <ChevronLeft size={22} color={colors.primary} />
+        <Text style={styles.backText}>Familiares</Text>
+      </TouchableOpacity>
+
+      {/* Al estilo de "Buscar" del iPhone: nombre, sitio en una línea y estado. */}
       <View style={styles.header}>
-        <View style={styles.titleInfo}>
-          <Text style={styles.name}>
-            {member.firstName} {member.lastName}
-          </Text>
-          <View style={styles.subtitleRow}>
-            <Clock size={14} color={Colors.textSecondary} />
-            <Text style={styles.subtitle}>{formatTime(location?.capturedAt)}</Text>
+        <Text style={styles.name}>
+          {member.firstName} {member.lastName}
+        </Text>
+        {location && requestState.status !== 'sharing-disabled' ? (
+          <View style={styles.placeRow}>
+            <MapPin size={15} color={colors.textSecondary} />
+            <Text style={styles.place} numberOfLines={1}>
+              {place ?? 'Buscando el nombre del lugar…'}
+            </Text>
           </View>
-        </View>
-
-        <TouchableOpacity onPress={onDeselect} style={styles.closeBtn} activeOpacity={0.7}>
-          <X size={18} color={Colors.textSecondary} />
-        </TouchableOpacity>
+        ) : null}
+        <Text style={[styles.status, { color: toneColor[status.tone] }]}>{status.text}</Text>
+        {status.detail ? <Text style={styles.statusDetail}>{status.detail}</Text> : null}
       </View>
-
-      {/* Status Feedback Banners */}
-      {requestState.status === 'waiting' && requestState.message ? (
-        <View style={styles.messageBanner}>
-          <CheckCircle size={18} color={Colors.secondary} />
-          <Text style={styles.messageText}>{requestState.message}</Text>
-        </View>
-      ) : null}
-
-      {/* Familiar inalcanzable: se muestra el motivo junto a la hora de su última
-          ubicación conocida, que es lo que sigue pintado en el mapa. */}
-      {requestState.status === 'unavailable' && requestState.message ? (
-        <View style={styles.unavailableBanner}>
-          <WifiOff size={18} color={Colors.warning} />
-          <Text style={styles.unavailableText}>{requestState.message}</Text>
-        </View>
-      ) : null}
 
       {error ? (
         <View style={styles.errorBanner}>
-          <AlertCircle size={18} color={Colors.danger} />
+          <AlertCircle size={18} color={colors.danger} />
           <Text style={styles.errorText}>{error}</Text>
         </View>
       ) : null}
@@ -80,7 +93,7 @@ export const RequestLocationAction: React.FC<RequestLocationActionProps> = ({
       {/* Prominent On-Demand Action Button */}
       <BigButton
         title={esperando ? 'Esperando respuesta…' : 'Solicitar Ubicación en Vivo'}
-        icon={<Radio size={22} color={Colors.textInverse} />}
+        icon={<Radio size={22} color={colors.textInverse} />}
         onPress={onRequestLocation}
         loading={esperando}
         style={styles.actionBtn}
@@ -89,88 +102,69 @@ export const RequestLocationAction: React.FC<RequestLocationActionProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   container: {
     paddingHorizontal: Spacing.lg,
     paddingTop: Spacing.xs,
     paddingBottom: Spacing.md,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    marginBottom: Spacing.md,
-  },
-  titleInfo: {
-    flex: 1,
-  },
-  name: {
-    ...Typography.title2,
-    color: Colors.textPrimary,
-  },
-  subtitleRow: {
+  placeRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    marginTop: 2,
+    marginTop: 4,
   },
-  subtitle: {
+  place: {
+    ...Typography.subhead,
+    color: colors.textPrimary,
+    flexShrink: 1,
+  },
+  status: {
+    ...Typography.subhead,
+    fontWeight: '700',
+    marginTop: 4,
+  },
+  statusDetail: {
     ...Typography.footnote,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
+    marginTop: 1,
   },
-  closeBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: Colors.surfaceMuted,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  unavailableBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    backgroundColor: 'rgba(255, 149, 0, 0.12)',
-    padding: Spacing.md,
-    borderRadius: Spacing.borderRadiusMd,
+  header: {
     marginBottom: Spacing.md,
   },
-  unavailableText: {
-    ...Typography.callout,
-    color: Colors.textPrimary,
-    flex: 1,
+  name: {
+    ...Typography.title2,
+    color: colors.textPrimary,
   },
-  messageBanner: {
+  backBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.sm,
-    backgroundColor: 'rgba(52, 199, 89, 0.12)',
-    padding: Spacing.md,
-    borderRadius: Spacing.borderRadiusMd,
-    marginBottom: Spacing.md,
+    alignSelf: 'flex-start',
+    marginLeft: -6,
+    marginBottom: Spacing.xs,
+    paddingVertical: Spacing.xs,
   },
-  messageText: {
-    ...Typography.callout,
-    color: Colors.secondary,
+  backText: {
+    ...Typography.body,
+    color: colors.primary,
     fontWeight: '600',
-    flex: 1,
   },
   errorBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
-    backgroundColor: 'rgba(255, 59, 48, 0.12)',
+    backgroundColor: colors.dangerMuted,
     padding: Spacing.md,
     borderRadius: Spacing.borderRadiusMd,
     marginBottom: Spacing.md,
   },
   errorText: {
     ...Typography.callout,
-    color: Colors.danger,
+    color: colors.danger,
     fontWeight: '600',
     flex: 1,
   },
   actionBtn: {
     marginTop: Spacing.xs,
   },
-});
+}));

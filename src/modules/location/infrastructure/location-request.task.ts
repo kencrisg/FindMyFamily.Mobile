@@ -1,5 +1,6 @@
 import * as TaskManager from 'expo-task-manager';
 import * as Location from 'expo-location';
+import { capturePosition } from './position-capture';
 import { locationRepository } from './location-api.repository';
 
 /**
@@ -56,6 +57,12 @@ const extractPayload = (data: unknown): LocationRequestPayload | null => {
   return null;
 };
 
+/** Tiempo máximo esperando una lectura nueva del GPS. */
+const CAPTURE_TIMEOUT_MS = 15_000;
+
+/** Antigüedad máxima de la última posición conocida para usarla si la nueva no llega. */
+const MAX_FALLBACK_AGE_MS = 15 * 60_000;
+
 TaskManager.defineTask(LOCATION_REQUEST_TASK, async ({ data, error }) => {
   if (error) {
     console.error('[LocationRequestTask] error del sistema:', error);
@@ -76,10 +83,19 @@ TaskManager.defineTask(LOCATION_REQUEST_TASK, async ({ data, error }) => {
       return;
     }
 
-    // 1. Encender el GPS y tomar una única lectura de alta precisión.
-    const location = await Location.getCurrentPositionAsync({
+    // 1. Encender el GPS y tomar una única lectura de alta precisión. Con límite de tiempo:
+    //    sin él, en interiores la lectura podía no llegar nunca y la familia veía "no
+    //    disponible". 15 s deja margen para responder dentro de los 30 s que espera quien
+    //    pregunta. Si no llega, se envía la última posición conocida reciente, con su hora.
+    const location = await capturePosition({
       accuracy: Location.Accuracy.High,
+      timeoutMs: CAPTURE_TIMEOUT_MS,
+      maxLastKnownAgeMs: MAX_FALLBACK_AGE_MS,
     });
+    if (!location) {
+      console.warn('[LocationRequestTask] el GPS no dio ninguna posición a tiempo; no se reporta.');
+      return;
+    }
 
     // 2. Reportar al backend. `toISOString()` siempre termina en 'Z': el backend exige UTC
     //    y rechaza marcas temporales sin zona horaria o en el futuro.

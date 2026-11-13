@@ -17,7 +17,23 @@ export class SignalRLocationService {
   async start(onLocationReported: (location: LocationCoordinate) => void): Promise<void> {
     this.onLocationReportedCallback = onLocationReported;
 
-    if (this.connection && this.connection.state === signalR.HubConnectionState.Connected) {
+    if (this.connection) {
+      const { state } = this.connection;
+      // Conectada o recuperándose sola: no hay nada que hacer.
+      if (
+        state === signalR.HubConnectionState.Connected ||
+        state === signalR.HubConnectionState.Connecting ||
+        state === signalR.HubConnectionState.Reconnecting
+      ) {
+        return;
+      }
+      // Caída del todo (la reconexión automática se rindió, o nunca llegó a conectar): se
+      // descarta antes de crear otra, para no dejar conexiones huérfanas.
+      await this.stop();
+    }
+
+    const token = await SecureStorageService.getAccessToken();
+    if (!token) {
       return;
     }
 
@@ -31,8 +47,21 @@ export class SignalRLocationService {
         },
       })
       .withAutomaticReconnect([0, 2000, 5000, 10000, 30000])
-      .configureLogging(signalR.LogLevel.Warning)
+      .configureLogging(signalR.LogLevel.None)
       .build();
+
+    // Aumentar el timeout para emuladores locales y evitar desconexiones prematuras
+    this.connection.serverTimeoutInMilliseconds = 60000;
+    this.connection.keepAliveIntervalInMilliseconds = 15000;
+
+    // `onclose` solo llega cuando la reconexión automática ya se ha rendido: a partir de
+    // aquí no se reconecta sola. La siguiente petición de ubicación vuelve a llamar a
+    // start(), que crea una conexión nueva.
+    this.connection.onclose((error) => {
+      if (error) {
+        console.log('[SignalR] Conexión perdida; se reconectará en la próxima petición.', error.message);
+      }
+    });
 
     // Listen for backend real-time broadcast
     this.connection.on(LOCATION_UPDATED_EVENT, (data: {

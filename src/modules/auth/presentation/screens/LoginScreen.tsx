@@ -1,24 +1,16 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  TouchableOpacity,
-} from 'react-native';
+import { View, Text, KeyboardAvoidingView, Platform, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
 import { ShieldCheck, MapPin } from 'lucide-react-native';
 import { useAuthStore } from '../../application/auth.store';
 import { CustomInput } from '../../../../shared/presentation/components/CustomInput';
 import { BigButton } from '../../../../shared/presentation/components/BigButton';
-import { Colors } from '../../../../shared/theme/colors';
+import { makeStyles, useTheme } from '../../../../shared/theme/use-theme';
 import { Typography, Spacing } from '../../../../shared/theme/typography';
 
 export const LoginScreen: React.FC = () => {
-  const router = useRouter();
+  const styles = useStyles();
+  const { colors } = useTheme();
   const { login, status, error, clearError } = useAuthStore();
 
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -38,15 +30,13 @@ export const LoginScreen: React.FC = () => {
       return;
     }
 
-    const success = await login({
+    // Si el login va bien no hace falta navegar: Stack.Protected lleva al usuario a la
+    // pantalla principal en cuanto la sesión pasa a `authenticated`.
+    await login({
       phoneNumber: phoneNumber.trim(),
       password: password.trim(),
       deviceModel: Platform.OS === 'ios' ? 'Apple iPhone' : 'Android Device',
     });
-
-    if (success) {
-      router.replace('/(main)');
-    }
   };
 
   return (
@@ -63,7 +53,7 @@ export const LoginScreen: React.FC = () => {
           {/* Brand Header */}
           <View style={styles.header}>
             <View style={styles.iconCircle}>
-              <MapPin size={36} color={Colors.primary} />
+              <MapPin size={36} color={colors.primary} />
             </View>
             <Text style={styles.title}>FindMyFamily</Text>
             <Text style={styles.subtitle}>
@@ -110,7 +100,7 @@ export const LoginScreen: React.FC = () => {
             />
 
             <View style={styles.securityBadge}>
-              <ShieldCheck size={18} color={Colors.secondary} />
+              <ShieldCheck size={18} color={colors.secondary} />
               <Text style={styles.securityText}>
                 Tu ubicación sólo es visible para tu círculo familiar.
               </Text>
@@ -129,10 +119,10 @@ export const LoginScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   safeArea: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: colors.background,
   },
   keyboardView: {
     flex: 1,
@@ -152,19 +142,19 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: Colors.primaryMuted,
+    backgroundColor: colors.primaryMuted,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: Spacing.md,
   },
   title: {
     ...Typography.largeTitle,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     marginBottom: Spacing.xs,
   },
   subtitle: {
     ...Typography.body,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     textAlign: 'center',
     paddingHorizontal: Spacing.lg,
     fontSize: 16,
@@ -173,16 +163,16 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   errorBanner: {
-    backgroundColor: 'rgba(255, 59, 48, 0.12)',
+    backgroundColor: colors.dangerMuted,
     padding: Spacing.md,
     borderRadius: Spacing.borderRadiusMd,
     marginBottom: Spacing.md,
     borderWidth: 1,
-    borderColor: 'rgba(255, 59, 48, 0.3)',
+    borderColor: colors.dangerBorder,
   },
   errorBannerText: {
     ...Typography.callout,
-    color: Colors.danger,
+    color: colors.danger,
     fontWeight: '600',
     textAlign: 'center',
   },
@@ -199,7 +189,7 @@ const styles = StyleSheet.create({
   },
   securityText: {
     ...Typography.footnote,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     textAlign: 'center',
     flex: 1,
   },
@@ -213,9 +203,9 @@ const styles = StyleSheet.create({
   },
   footerNoticeText: {
     ...Typography.footnote,
-    color: Colors.textTertiary,
+    color: colors.textTertiary,
     textAlign: 'center',
     paddingHorizontal: Spacing.lg,
     lineHeight: 18,
   },
-});
+}));

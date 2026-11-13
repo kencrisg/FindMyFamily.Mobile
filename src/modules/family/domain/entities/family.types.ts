@@ -1,9 +1,12 @@
+/** Rol DENTRO de una familia. No confundir con el rol de plataforma (super admin). */
+export type FamilyRole = 'admin' | 'member';
+
 export interface FamilyMemberSummary {
   userId: string;
   firstName: string;
   lastName: string;
   phoneNumber: string;
-  role: 'admin' | 'member' | string;
+  role: FamilyRole | string;
   joinedAt: string;
 }
 
@@ -27,7 +30,7 @@ export interface CreateFamilyData {
 
 export interface AddFamilyMemberData {
   phoneNumber: string;
-  role?: string;
+  role?: FamilyRole;
 }
 
 export interface CreateFamilyMemberUserData {
@@ -35,4 +38,11 @@ export interface CreateFamilyMemberUserData {
   lastName: string;
   phoneNumber: string;
   password: string;
+}
+
+/** Campos que se pueden editar de un miembro. Los omitidos no se modifican. */
+export interface UpdateFamilyMemberUserData {
+  firstName?: string;
+  lastName?: string;
+  phoneNumber?: string;
 }

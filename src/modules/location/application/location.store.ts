@@ -17,7 +17,7 @@ import { formatRelativeTime } from '../../../shared/presentation/utils/format-re
 export const LOCATION_REQUEST_TIMEOUT_MS = 30_000;
 
 /** Estado de la petición de ubicación de un familiar concreto. */
-export type MemberRequestStatus = 'idle' | 'waiting' | 'received' | 'unavailable';
+export type MemberRequestStatus = 'idle' | 'waiting' | 'received' | 'unavailable' | 'sharing-disabled';
 
 export interface MemberRequestState {
   status: MemberRequestStatus;
@@ -42,6 +42,8 @@ interface LocationState {
   startSignalR: () => Promise<void>;
   stopSignalR: () => Promise<void>;
   clearStatus: () => void;
+  /** Borra coordenadas y peticiones al cerrar sesión: son datos de la familia anterior. */
+  reset: () => void;
 }
 
 const IDLE: MemberRequestState = { status: 'idle', message: null, requestId: null };
@@ -78,6 +80,11 @@ export const useLocationStore = create<LocationState>((set, get) => ({
   requestLocation: async (targetUserId: string, familyId: string) => {
     clearTimer(targetUserId);
 
+    // La respuesta llega por SignalR. Si la conexión se cayó (p. ej. el teléfono estuvo sin
+    // red más tiempo del que aguanta la reconexión automática), nadie la volvía a abrir: el
+    // familiar respondía, pero aquí se mostraba "no disponible". Se asegura antes de pedir.
+    await get().startSignalR();
+
     set((state) => ({
       error: null,
       requests: {
@@ -92,6 +99,22 @@ export const useLocationStore = create<LocationState>((set, get) => ({
 
     try {
       const response = await locationRepository.requestLocation(targetUserId, familyId);
+
+      // El familiar dejó de compartir su ubicación. Se borra también la que hubiera en
+      // memoria de antes: seguir pintándola en el mapa iría contra su decisión.
+      if (response.status === 'SHARING_DISABLED') {
+        set((state) => {
+          const { [targetUserId]: _hidden, ...locations } = state.locations;
+          return {
+            locations,
+            requests: {
+              ...state.requests,
+              [targetUserId]: { status: 'sharing-disabled', message: response.message, requestId: null },
+            },
+          };
+        });
+        return false;
+      }
 
       // Si el backend ya trae una última ubicación conocida, se pinta de inmediato: es el
       // único dato disponible mientras se espera, y el definitivo si nadie responde.
@@ -200,9 +223,11 @@ export const useLocationStore = create<LocationState>((set, get) => ({
     set((state) => {
       const requests = { ...state.requests };
 
-      // Una ubicación recibida mientras se esperaba cierra la petición: se cancela el
-      // temporizador para que no marque "no disponible" sobre un dato que ya llegó.
-      if (!options?.keepRequestState && state.requests[location.userId]?.status === 'waiting') {
+      // Una ubicación recibida cierra la petición: se cancela el temporizador para que no
+      // marque "no disponible" sobre un dato que ya llegó. También si llega TARDE, cuando ya
+      // se mostraba "Fuera de cobertura": la respuesta nueva es la verdad más reciente.
+      const current = state.requests[location.userId]?.status;
+      if (!options?.keepRequestState && (current === 'waiting' || current === 'unavailable')) {
         clearTimer(location.userId);
         requests[location.userId] = {
           status: 'received',
@@ -221,6 +246,10 @@ export const useLocationStore = create<LocationState>((set, get) => ({
   getRequestState: (userId: string) => get().requests[userId] ?? IDLE,
 
   cancelRequest: (userId: string) => {
+    // Solo se abandona una petición en curso. Un resultado ya conocido ("Fuera de
+    // cobertura", "Ubicación desactivada") se conserva: si se borrara al volver a la lista,
+    // la lista diría "Ahora" justo después de que la tarjeta dijera "Fuera de cobertura".
+    if (get().requests[userId]?.status !== 'waiting') return;
     clearTimer(userId);
     set((state) => {
       const requests = { ...state.requests };
@@ -244,4 +273,10 @@ export const useLocationStore = create<LocationState>((set, get) => ({
   },
 
   clearStatus: () => set({ error: null }),
+
+  reset: () => {
+    timers.forEach((timer) => clearTimeout(timer));
+    timers.clear();
+    set({ locations: {}, requests: {}, error: null });
+  },
 }));

@@ -1,20 +1,22 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { ShieldAlert } from 'lucide-react-native';
 import { BigButton } from '../../../../shared/presentation/components/BigButton';
-import { Colors } from '../../../../shared/theme/colors';
+import { makeStyles, useTheme } from '../../../../shared/theme/use-theme';
 import { Typography, Spacing } from '../../../../shared/theme/typography';
 
 export const RegisterScreen: React.FC = () => {
+  const styles = useStyles();
+  const { colors } = useTheme();
   const router = useRouter();
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.card}>
         <View style={styles.iconCircle}>
-          <ShieldAlert size={40} color={Colors.warning} />
+          <ShieldAlert size={40} color={colors.warning} />
         </View>
         <Text style={styles.title}>Registro Restringido</Text>
         <Text style={styles.message}>
@@ -30,39 +32,39 @@ export const RegisterScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: colors.background,
     justifyContent: 'center',
     paddingHorizontal: Spacing.screenPadding,
   },
   card: {
-    backgroundColor: Colors.cardBackground,
+    backgroundColor: colors.cardBackground,
     borderRadius: Spacing.borderRadiusLg,
     padding: Spacing.xl,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
   },
   iconCircle: {
     width: 68,
     height: 68,
     borderRadius: 34,
-    backgroundColor: 'rgba(255, 149, 0, 0.12)',
+    backgroundColor: colors.warningMuted,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: Spacing.md,
   },
   title: {
     ...Typography.title2,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     marginBottom: Spacing.sm,
     textAlign: 'center',
   },
   message: {
     ...Typography.body,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     textAlign: 'center',
     marginBottom: Spacing.xl,
     lineHeight: 22,
@@ -70,4 +72,4 @@ const styles = StyleSheet.create({
   button: {
     width: '100%',
   },
-});
+}));

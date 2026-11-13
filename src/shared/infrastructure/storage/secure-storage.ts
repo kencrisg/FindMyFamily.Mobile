@@ -11,13 +11,15 @@ export interface StoredTokens {
 }
 
 export class SecureStorageService {
+  /**
+   * Guarda los tokens. **Propaga el error a propósito**: si se silencia, el login da por
+   * buena una sesión que no se persistió, la app entra como "autenticada" y toda petición
+   * posterior falla con 401 sin que el usuario entienda por qué. Es mejor un mensaje de
+   * error en el login que una sesión fantasma.
+   */
   static async saveTokens(tokens: StoredTokens): Promise<void> {
-    try {
-      await SecureStore.setItemAsync(ACCESS_TOKEN_KEY, tokens.accessToken);
-      await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, tokens.refreshToken);
-    } catch (error) {
-      console.error('Error saving tokens to SecureStore:', error);
-    }
+    await SecureStore.setItemAsync(ACCESS_TOKEN_KEY, tokens.accessToken);
+    await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, tokens.refreshToken);
   }
 
   static async getTokens(): Promise<StoredTokens | null> {

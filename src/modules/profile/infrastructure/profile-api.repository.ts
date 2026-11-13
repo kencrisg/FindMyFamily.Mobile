@@ -1,5 +1,6 @@
 import { apiClient } from '../../../shared/infrastructure/api/api-client';
 import {
+  UpdateMyProfileRequest,
   UpdatePasswordRequest,
   UpdatePhoneRequest,
   UserProfile,
@@ -9,6 +10,16 @@ import { IProfileRepository } from '../domain/interfaces/profile-repository.inte
 export class ProfileApiRepository implements IProfileRepository {
   async getMyProfile(): Promise<UserProfile> {
     const response = await apiClient.get<UserProfile>('/api/users/me');
+    return response.data;
+  }
+
+  async updateMyProfile(data: UpdateMyProfileRequest): Promise<UserProfile> {
+    const response = await apiClient.patch<UserProfile>('/api/users/me', data);
+    return response.data;
+  }
+
+  async setLocationSharing(enabled: boolean): Promise<UserProfile> {
+    const response = await apiClient.patch<UserProfile>('/api/users/me/location-sharing', { enabled });
     return response.data;
   }
 

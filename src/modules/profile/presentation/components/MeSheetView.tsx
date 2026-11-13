@@ -1,8 +1,10 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { Smartphone, Shield, LogOut, CheckCircle2 } from 'lucide-react-native';
+import { View, Text, TouchableOpacity } from 'react-native';
+import { useRouter } from 'expo-router';
+import { LogOut, ChevronRight, Settings, SlidersHorizontal, UserPen } from 'lucide-react-native';
 import { useAuthStore } from '../../../auth/application/auth.store';
-import { Colors } from '../../../../shared/theme/colors';
+import { isFamilyAdminRole } from '../../../family/presentation/components/family-roles';
+import { makeStyles, useTheme } from '../../../../shared/theme/use-theme';
 import { Typography, Spacing } from '../../../../shared/theme/typography';
 
 interface MeSheetViewProps {
@@ -10,7 +12,11 @@ interface MeSheetViewProps {
 }
 
 export const MeSheetView: React.FC<MeSheetViewProps> = ({ onLogout }) => {
-  const { user } = useAuthStore();
+  const styles = useStyles();
+  const { colors } = useTheme();
+  const router = useRouter();
+  const user = useAuthStore((state) => state.user);
+  const adminFamilies = (user?.families ?? []).filter((f) => isFamilyAdminRole(f.familyRole));
   const initials = user
     ? `${user.firstName.charAt(0)}${user.lastName.charAt(0)}`.toUpperCase()
     : 'YO';
@@ -30,43 +36,73 @@ export const MeSheetView: React.FC<MeSheetViewProps> = ({ onLogout }) => {
         </View>
       </View>
 
-      {/* Settings / Status List */}
+      {/* Accesos: perfil y familias que administra */}
       <View style={styles.section}>
-        <View style={styles.row}>
+        <TouchableOpacity
+          style={[styles.row, adminFamilies.length === 0 && styles.lastRow]}
+          onPress={() => router.push('/profile')}
+          activeOpacity={0.6}
+          accessibilityRole="button"
+        >
           <View style={styles.rowIcon}>
-            <Smartphone size={20} color={Colors.primary} />
+            <UserPen size={20} color={colors.primary} />
           </View>
           <View style={styles.rowContent}>
-            <Text style={styles.rowTitle}>Este Dispositivo</Text>
-            <Text style={styles.rowSubtitle}>Compartir mi ubicación con la familia</Text>
+            <Text style={styles.rowTitle}>Mi perfil</Text>
+            <Text style={styles.rowSubtitle}>Nombre, teléfono y contraseña</Text>
           </View>
-          <View style={styles.activeTag}>
-            <CheckCircle2 size={16} color={Colors.secondary} />
-            <Text style={styles.activeTagText}>Activo</Text>
-          </View>
-        </View>
+          <ChevronRight size={18} color={colors.textTertiary} />
+        </TouchableOpacity>
 
-        <View style={styles.row}>
+        {adminFamilies.map((family, index) => (
+          <TouchableOpacity
+            key={family.familyId}
+            style={[styles.row, index === adminFamilies.length - 1 && styles.lastRow]}
+            onPress={() => router.push(`/family/${family.familyId}`)}
+            activeOpacity={0.6}
+            accessibilityRole="button"
+          >
+            <View style={styles.rowIcon}>
+              <Settings size={20} color={colors.primary} />
+            </View>
+            <View style={styles.rowContent}>
+              <Text style={styles.rowTitle}>Administrar {family.familyName}</Text>
+              <Text style={styles.rowSubtitle}>Añadir, editar o quitar familiares</Text>
+            </View>
+            <ChevronRight size={18} color={colors.textTertiary} />
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* Configuración de la app: apariencia y estado de este teléfono */}
+      <View style={styles.section}>
+        <TouchableOpacity
+          style={[styles.row, styles.lastRow]}
+          onPress={() => router.push('/settings')}
+          activeOpacity={0.6}
+          accessibilityRole="button"
+        >
           <View style={styles.rowIcon}>
-            <Shield size={20} color={Colors.secondary} />
+            <SlidersHorizontal size={20} color={colors.primary} />
           </View>
           <View style={styles.rowContent}>
-            <Text style={styles.rowTitle}>Privacidad</Text>
-            <Text style={styles.rowSubtitle}>GPS sólo se activa bajo petición de tu familia</Text>
+            <Text style={styles.rowTitle}>Configuración de la app</Text>
+            <Text style={styles.rowSubtitle}>Modo oscuro, ubicación y privacidad</Text>
           </View>
-        </View>
+          <ChevronRight size={18} color={colors.textTertiary} />
+        </TouchableOpacity>
       </View>
 
       {/* Logout Action */}
       <TouchableOpacity style={styles.logoutBtn} onPress={onLogout} activeOpacity={0.7}>
-        <LogOut size={20} color={Colors.danger} />
+        <LogOut size={20} color={colors.danger} />
         <Text style={styles.logoutText}>Cerrar Sesión</Text>
       </TouchableOpacity>
     </View>
   );
 };
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   container: {
     paddingHorizontal: Spacing.lg,
     paddingTop: Spacing.xs,
@@ -75,25 +111,25 @@ const styles = StyleSheet.create({
   profileCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.cardBackground,
+    backgroundColor: colors.cardBackground,
     padding: Spacing.lg,
     borderRadius: Spacing.borderRadiusMd,
     marginBottom: Spacing.lg,
     borderWidth: 1,
-    borderColor: Colors.borderSubtle,
+    borderColor: colors.borderSubtle,
   },
   avatar: {
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: Colors.primary,
+    backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: Spacing.lg,
   },
   avatarText: {
     ...Typography.title2,
-    color: Colors.textInverse,
+    color: colors.textInverse,
     fontWeight: '700',
   },
   profileInfo: {
@@ -101,34 +137,37 @@ const styles = StyleSheet.create({
   },
   userName: {
     ...Typography.headline,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     fontSize: 18,
   },
   userPhone: {
     ...Typography.subhead,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     marginTop: 2,
   },
   section: {
-    backgroundColor: Colors.cardBackground,
+    backgroundColor: colors.cardBackground,
     borderRadius: Spacing.borderRadiusMd,
     paddingHorizontal: Spacing.lg,
     marginBottom: Spacing.xl,
     borderWidth: 1,
-    borderColor: Colors.borderSubtle,
+    borderColor: colors.borderSubtle,
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: Spacing.md,
     borderBottomWidth: 0.5,
-    borderBottomColor: Colors.borderSubtle,
+    borderBottomColor: colors.borderSubtle,
+  },
+  lastRow: {
+    borderBottomWidth: 0,
   },
   rowIcon: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: Colors.surfaceMuted,
+    backgroundColor: colors.surfaceMuted,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: Spacing.md,
@@ -138,22 +177,12 @@ const styles = StyleSheet.create({
   },
   rowTitle: {
     ...Typography.headline,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     fontSize: 16,
   },
   rowSubtitle: {
     ...Typography.footnote,
-    color: Colors.textSecondary,
-  },
-  activeTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  activeTagText: {
-    ...Typography.footnote,
-    color: Colors.secondary,
-    fontWeight: '700',
+    color: colors.textSecondary,
   },
   logoutBtn: {
     flexDirection: 'row',
@@ -161,15 +190,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: Spacing.sm,
     height: Spacing.buttonHeight,
-    backgroundColor: 'rgba(255, 59, 48, 0.1)',
+    backgroundColor: colors.dangerMuted,
     borderRadius: Spacing.borderRadiusMd,
     borderWidth: 1.5,
-    borderColor: 'rgba(255, 59, 48, 0.3)',
+    borderColor: colors.dangerBorder,
   },
   logoutText: {
     ...Typography.headline,
-    color: Colors.danger,
+    color: colors.danger,
     fontWeight: '700',
     fontSize: 17,
   },
-});
+}));

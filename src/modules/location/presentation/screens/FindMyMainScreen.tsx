@@ -1,47 +1,45 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  FlatList,
-  Platform,
-  Alert,
-} from 'react-native';
+import { View, Text, TouchableOpacity, FlatList, Platform, Alert } from 'react-native';
 import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
-import { Users, User, Plus, RefreshCw } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { Users, User, Settings, RefreshCw } from 'lucide-react-native';
 
 import { useAuthStore } from '../../../auth/application/auth.store';
 import { useFamilyStore } from '../../../family/application/family.store';
 import { useLocationStore } from '../../application/location.store';
 
-import { AppleMapView } from '../components/AppleMapView';
+import { AppleMapView, AppleMapViewHandle } from '../components/AppleMapView';
 import { MemberListItem } from '../../../family/presentation/components/MemberListItem';
-import { AddMemberModal } from '../../../family/presentation/components/AddMemberModal';
 import { RequestLocationAction } from '../components/RequestLocationAction';
 import { MeSheetView } from '../../../profile/presentation/components/MeSheetView';
-import { GlassView } from '../../../../shared/presentation/components/GlassView';
 
-import { Colors } from '../../../../shared/theme/colors';
+import { makeStyles, useTheme } from '../../../../shared/theme/use-theme';
 import { Typography, Spacing } from '../../../../shared/theme/typography';
 import { BackgroundTaskManager } from '../../infrastructure/background-task.manager';
 
 type TabType = 'people' | 'me';
 
 export const FindMyMainScreen: React.FC = () => {
-  const router = useRouter();
+  const styles = useStyles();
+  const { colors } = useTheme();
   const bottomSheetRef = useRef<BottomSheet>(null);
+  const mapRef = useRef<AppleMapViewHandle>(null);
+  const router = useRouter();
+  // La app se dibuja de borde a borde: la barra de navegación de Android tapaba las pestañas.
+  const insets = useSafeAreaInsets();
+  // Altura real de la barra de pestañas (incluye el margen de la barra de navegación del
+  // sistema). La hoja la usa como `bottomInset` para quedarse siempre por encima de ella.
+  const [tabBarHeight, setTabBarHeight] = useState(64 + insets.bottom);
 
   const { logout, isFamilyAdmin } = useAuthStore();
+  const currentUserId = useAuthStore((state) => state.user?.id);
   const {
     families,
     activeFamily,
     selectedMember,
     isLoading: familyLoading,
     fetchFamilies,
-    addMember,
-    createMemberUser,
     setSelectedMember,
   } = useFamilyStore();
 
@@ -63,8 +61,25 @@ export const FindMyMainScreen: React.FC = () => {
   const requests = useLocationStore((state) => state.requests);
 
   const [activeTab, setActiveTab] = useState<TabType>('people');
-  const [isAddModalVisible, setIsAddModalVisible] = useState(false);
   const [permissionWarning, setPermissionWarning] = useState<string | null>(null);
+
+  // El propio usuario va primero y se muestra como "Yo".
+  const members = useMemo(() => {
+    const list = activeFamily?.members ?? [];
+    return [...list].sort((a, b) => Number(b.userId === currentUserId) - Number(a.userId === currentUserId));
+  }, [activeFamily, currentUserId]);
+
+  /**
+   * Pedirse la ubicación a uno mismo no tiene sentido: mandaría una notificación silenciosa
+   * a este mismo teléfono. Tocarse a uno mismo centra el mapa en su posición y baja la hoja
+   * para que se vea.
+   */
+  const showMyself = () => {
+    setSelectedMember(null);
+    clearStatus();
+    bottomSheetRef.current?.snapToIndex(0);
+    mapRef.current?.centerOnUser();
+  };
 
   // Snap points for the Apple Find My bottom sheet
   const snapPoints = useMemo(() => ['18%', '45%', '85%'], []);
@@ -108,10 +123,9 @@ export const FindMyMainScreen: React.FC = () => {
       {
         text: 'Cerrar Sesión',
         style: 'destructive',
-        onPress: async () => {
-          await logout();
-          router.replace('/(auth)/login');
-        },
+        // No se navega a mano: al pasar la sesión a `unauthenticated`, Stack.Protected
+        // saca al usuario de esta pantalla y lo lleva al login.
+        onPress: logout,
       },
     ]);
   };
@@ -120,10 +134,16 @@ export const FindMyMainScreen: React.FC = () => {
     <View style={styles.container}>
       {/* 1. Full Screen Interactive Map */}
       <AppleMapView
-        members={activeFamily?.members || []}
+        ref={mapRef}
+        members={members}
         locations={locations}
         selectedMember={selectedMember}
+        currentUserId={currentUserId}
         onSelectMember={(member) => {
+          if (member.userId === currentUserId) {
+            showMyself();
+            return;
+          }
           setSelectedMember(member);
           clearStatus();
           bottomSheetRef.current?.snapToIndex(1);
@@ -135,6 +155,7 @@ export const FindMyMainScreen: React.FC = () => {
         ref={bottomSheetRef}
         index={1}
         snapPoints={snapPoints}
+        bottomInset={tabBarHeight}
         handleIndicatorStyle={styles.sheetIndicator}
         backgroundStyle={styles.sheetBackground}
       >
@@ -161,15 +182,17 @@ export const FindMyMainScreen: React.FC = () => {
                   onPress={() => fetchFamilies()}
                   activeOpacity={0.7}
                 >
-                  <RefreshCw size={18} color={Colors.textPrimary} />
+                  <RefreshCw size={18} color={colors.textPrimary} />
                 </TouchableOpacity>
-                {canManageMembers && (
+                {canManageMembers && activeFamily && (
                   <TouchableOpacity
                     style={[styles.actionIconBtn, styles.addIconBtn]}
-                    onPress={() => setIsAddModalVisible(true)}
+                    onPress={() => router.push(`/family/${activeFamily.id}`)}
                     activeOpacity={0.7}
+                    accessibilityRole="button"
+                    accessibilityLabel="Administrar familia"
                   >
-                    <Plus size={20} color={Colors.textPrimary} />
+                    <Settings size={20} color={colors.textPrimary} />
                   </TouchableOpacity>
                 )}
               </View>
@@ -202,25 +225,36 @@ export const FindMyMainScreen: React.FC = () => {
                 />
               ) : (
                 <FlatList
-                  data={activeFamily?.members || []}
+                  data={members}
                   keyExtractor={(item) => item.userId}
-                  renderItem={({ item }) => (
-                    <MemberListItem
-                      member={item}
-                      location={locations[item.userId]}
-                      isSelected={selectedMember?.userId === item.userId}
-                      onPress={() => {
-                        setSelectedMember(item);
-                        clearStatus();
-                      }}
-                    />
-                  )}
+                  renderItem={({ item }) => {
+                    const isMe = item.userId === currentUserId;
+                    return (
+                      <MemberListItem
+                        member={item}
+                        location={locations[item.userId]}
+                        requestState={requests[item.userId]}
+                        isSelected={selectedMember?.userId === item.userId}
+                        isMe={isMe}
+                        onPress={
+                          isMe
+                            ? showMyself
+                            : () => {
+                                setSelectedMember(item);
+                                clearStatus();
+                              }
+                        }
+                      />
+                    );
+                  }}
                   ListEmptyComponent={
                     <View style={styles.emptyState}>
                       <Text style={styles.emptyText}>
                         {familyLoading
                           ? 'Cargando tu círculo familiar...'
-                          : 'No tienes familiares en este grupo aún. Toca + para invitar a uno.'}
+                          : canManageMembers
+                            ? 'Aún no hay familiares en este grupo. Toca el engranaje para añadirlos.'
+                            : 'Aún no hay familiares en este grupo.'}
                       </Text>
                     </View>
                   }
@@ -233,90 +267,90 @@ export const FindMyMainScreen: React.FC = () => {
             )}
           </View>
 
-          {/* Bottom Tabs Bar (Apple Find My style: People | Me) */}
-          <View style={styles.tabsBar}>
-            <TouchableOpacity
-              style={[styles.tabItem, activeTab === 'people' && styles.activeTabItem]}
-              onPress={() => {
-                setActiveTab('people');
-                setSelectedMember(null);
-              }}
-              activeOpacity={0.8}
-            >
-              <Users
-                size={24}
-                color={activeTab === 'people' ? Colors.primary : Colors.textTertiary}
-              />
-              <Text
-                style={[
-                  styles.tabLabel,
-                  activeTab === 'people' && styles.activeTabLabel,
-                ]}
-              >
-                Personas
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.tabItem, activeTab === 'me' && styles.activeTabItem]}
-              onPress={() => {
-                setActiveTab('me');
-                setSelectedMember(null);
-              }}
-              activeOpacity={0.8}
-            >
-              <User
-                size={24}
-                color={activeTab === 'me' ? Colors.primary : Colors.textTertiary}
-              />
-              <Text
-                style={[
-                  styles.tabLabel,
-                  activeTab === 'me' && styles.activeTabLabel,
-                ]}
-              >
-                Yo
-              </Text>
-            </TouchableOpacity>
-          </View>
         </BottomSheetView>
       </BottomSheet>
 
-      {/* Add Member Modal */}
-      <AddMemberModal
-        visible={isAddModalVisible}
-        onClose={() => setIsAddModalVisible(false)}
-        onCreateMember={createMemberUser}
-        isLoading={familyLoading}
-      />
+      {/* 3. Barra de pestañas fija. Va fuera de la hoja a propósito: dentro subía y bajaba
+          con ella. La hoja se desliza por encima gracias a `bottomInset`. */}
+      <View
+        style={[styles.tabsBar, { paddingBottom: Math.max(insets.bottom, Spacing.md) }]}
+        onLayout={(event) => setTabBarHeight(event.nativeEvent.layout.height)}
+      >
+        <TouchableOpacity
+          style={[styles.tabItem, activeTab === 'people' && styles.activeTabItem]}
+          onPress={() => {
+            setActiveTab('people');
+            setSelectedMember(null);
+          }}
+          activeOpacity={0.8}
+        >
+          <Users
+            size={24}
+            color={activeTab === 'people' ? colors.primary : colors.textTertiary}
+          />
+          <Text
+            style={[
+              styles.tabLabel,
+              activeTab === 'people' && styles.activeTabLabel,
+            ]}
+          >
+            Personas
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.tabItem, activeTab === 'me' && styles.activeTabItem]}
+          onPress={() => {
+            setActiveTab('me');
+            setSelectedMember(null);
+            // "Yo" tiene más contenido que la lista: a media altura, la configuración y el
+            // cierre de sesión quedaban ocultos y había que saber arrastrar la hoja.
+            bottomSheetRef.current?.snapToIndex(2);
+          }}
+          activeOpacity={0.8}
+        >
+          <User
+            size={24}
+            color={activeTab === 'me' ? colors.primary : colors.textTertiary}
+          />
+          <Text
+            style={[
+              styles.tabLabel,
+              activeTab === 'me' && styles.activeTabLabel,
+            ]}
+          >
+            Yo
+          </Text>
+        </TouchableOpacity>
+      </View>
+
     </View>
   );
 };
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: colors.background,
   },
   sheetBackground: {
-    backgroundColor: 'rgba(255, 255, 255, 0.94)',
+    backgroundColor: colors.sheetBackground,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
-    shadowColor: Colors.shadowElevated,
+    shadowColor: colors.shadowElevated,
     shadowOffset: { width: 0, height: -6 },
     shadowOpacity: 0.12,
     shadowRadius: 16,
     elevation: 12,
   },
   sheetIndicator: {
-    backgroundColor: '#C5C5C7',
+    backgroundColor: colors.handle,
     width: 38,
     height: 5,
     borderRadius: 3,
   },
   sheetContent: {
     flex: 1,
-    justifyContent: 'space-between',
   },
   sheetHeader: {
     flexDirection: 'row',
@@ -331,13 +365,13 @@ const styles = StyleSheet.create({
   },
   sheetTitle: {
     ...Typography.title1,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     fontSize: 26,
     fontWeight: '800',
   },
   membersCount: {
     ...Typography.footnote,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     marginTop: 1,
   },
   headerActions: {
@@ -349,12 +383,12 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: Colors.surfaceMuted,
+    backgroundColor: colors.surfaceMuted,
     alignItems: 'center',
     justifyContent: 'center',
   },
   addIconBtn: {
-    backgroundColor: Colors.surfaceMuted,
+    backgroundColor: colors.surfaceMuted,
   },
   body: {
     flex: 1,
@@ -364,11 +398,11 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.sm,
     padding: Spacing.md,
     borderRadius: Spacing.borderRadiusMd,
-    backgroundColor: 'rgba(255, 149, 0, 0.12)',
+    backgroundColor: colors.warningMuted,
   },
   permissionBannerText: {
     ...Typography.footnote,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   listContent: {
     paddingHorizontal: Spacing.sm,
@@ -381,19 +415,22 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     ...Typography.body,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     textAlign: 'center',
     fontSize: 16,
   },
   tabsBar: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-around',
     paddingTop: Spacing.sm,
-    paddingBottom: Platform.OS === 'ios' ? 24 : Spacing.md,
     borderTopWidth: 0.5,
-    borderTopColor: Colors.borderSubtle,
-    backgroundColor: 'rgba(255, 255, 255, 0.98)',
+    borderTopColor: colors.borderSubtle,
+    backgroundColor: colors.tabBarBackground,
   },
   tabItem: {
     alignItems: 'center',
@@ -404,12 +441,12 @@ const styles = StyleSheet.create({
   activeTabItem: {},
   tabLabel: {
     ...Typography.caption,
-    color: Colors.textTertiary,
+    color: colors.textTertiary,
     fontSize: 11,
     fontWeight: '600',
   },
   activeTabLabel: {
-    color: Colors.primary,
+    color: colors.primary,
     fontWeight: '700',
   },
-});
+}));
