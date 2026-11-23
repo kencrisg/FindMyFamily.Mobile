@@ -10,9 +10,11 @@ import { locationRepository } from './location-api.repository';
  * el sistema despierta este código en segundo plano, se captura UNA coordenada de alta
  * precisión, se reporta y el GPS se apaga. No hay rastreo continuo en ningún momento.
  *
- * `defineTask` tiene que ejecutarse en el ámbito del módulo y en un fichero que se cargue
- * al arrancar el bundle (lo importa `src/app/_layout.tsx`): cuando el sistema despierta la
- * app en segundo plano, carga el bundle y espera encontrar la tarea ya registrada.
+ * `defineTask` tiene que ejecutarse en el ámbito del módulo de un fichero que se evalúe al
+ * cargar el bundle. Lo importa `index.js` (el entry), NO `src/app/_layout.tsx`: cuando
+ * Android despierta la app sin interfaz para entregar el data message, solo se evalúa el
+ * entry; los layouts de Expo Router no llegan a ejecutarse porque React no renderiza.
+ * Definirla en el layout funcionaba con la app abierta y fallaba con la app cerrada.
  */
 export const LOCATION_REQUEST_TASK = 'FINDMYFAMILY_LOCATION_REQUEST_TASK';
 

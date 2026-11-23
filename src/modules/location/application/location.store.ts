@@ -11,10 +11,12 @@ import { formatRelativeTime } from '../../../shared/presentation/utils/format-re
  * push y lo encola, así que el backend responde REQUESTED y nadie contesta nunca. El único
  * sitio donde se puede detectar ese caso es aquí, esperando el evento de SignalR.
  *
- * 30 s cubre el camino completo con holgura (push → despertar el proceso → fijar GPS →
- * POST → difusión por SignalR), que en frío suele tardar entre 5 y 15 segundos.
+ * 45 s cubre el camino completo con holgura (push → despertar el proceso → cargar el
+ * bundle → fijar GPS → POST → difusión por SignalR). Con la app cerrada, el arranque en
+ * frío del proceso y la primera lectura del GPS pueden sumar más de 20 s; con 30 s una
+ * respuesta válida llegaba justo después de pintar "Fuera de cobertura".
  */
-export const LOCATION_REQUEST_TIMEOUT_MS = 30_000;
+export const LOCATION_REQUEST_TIMEOUT_MS = 45_000;
 
 /** Estado de la petición de ubicación de un familiar concreto. */
 export type MemberRequestStatus = 'idle' | 'waiting' | 'received' | 'unavailable' | 'sharing-disabled';

@@ -91,13 +91,19 @@ export class PushRegistrationService {
   static async register(): Promise<string | null> {
     await this.ensureAndroidChannel();
 
+    // 1. La tarea de fondo se registra SIEMPRE y antes de pedir permisos.
+    //    Un data message silencioso no necesita POST_NOTIFICATIONS: el permiso solo controla
+    //    que se puedan mostrar notificaciones visibles. Si se denegaba, antes se salía sin
+    //    registrar la tarea ni enviar el token, y la familia veía el teléfono como
+    //    inalcanzable aunque el dispositivo pudiera responder perfectamente.
+    await this.ensureBackgroundTask();
+
+    // 2. El permiso de notificaciones se pide igual, porque en Android 13+ es lo que permite
+    //    mostrar cualquier aviso. Pero no es requisito para recibir el push silencioso.
     const permitido = await this.ensurePermissions();
     if (!permitido) {
-      console.warn('[Push] permiso de notificaciones denegado: la familia no podrá localizar este teléfono.');
-      return null;
+      console.warn('[Push] permiso de notificaciones denegado: se recibirán los data messages, pero sin aviso visible.');
     }
-
-    await this.ensureBackgroundTask();
 
     const token = await this.getDeviceToken();
     if (!token) return null;

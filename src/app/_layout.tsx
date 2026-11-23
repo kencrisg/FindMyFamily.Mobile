@@ -6,10 +6,9 @@ import { StatusBar } from 'expo-status-bar';
 import { NavigationBar } from 'expo-navigation-bar';
 import { selectIsSuperAdmin, useAuthStore } from '../modules/auth/application/auth.store';
 
-// Importado por su efecto secundario: registra la tarea que atiende el Silent Push.
-// `TaskManager.defineTask` debe ejecutarse al cargar el bundle, porque cuando el sistema
-// despierta la app en segundo plano espera encontrar la tarea ya definida.
-import '../modules/location/infrastructure/location-request.task';
+// La tarea del Silent Push se define en `index.js` (el entry del bundle), no aquí: cuando
+// el sistema despierta la app sin interfaz, este layout no se ejecuta y la tarea quedaría
+// sin registrar. Ver el comentario de `src/modules/location/infrastructure/location-request.task.ts`.
 import { ConnectionErrorView } from '../modules/auth/presentation/components/ConnectionErrorView';
 import { makeStyles, useTheme } from '../shared/theme/use-theme';
 import { useThemeStore } from '../shared/theme/theme.store';
