@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Alert, ScrollView, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { KeyRound, LogOut, Phone, SlidersHorizontal, User, Users } from 'lucide-react-native';
+import { Info, KeyRound, LogOut, Phone, SlidersHorizontal, User, Users } from 'lucide-react-native';
 import { selectIsSuperAdmin, useAuthStore } from '../../../auth/application/auth.store';
 import { useProfileActions } from '../../application/use-profile-actions';
 import { ChangePasswordModal, ChangePhoneModal, EditNameModal } from '../components/ProfileForms';
@@ -136,6 +136,12 @@ export const ProfileScreen: React.FC = () => {
               subtitle="Modo oscuro"
               icon={<SlidersHorizontal size={20} color={colors.primary} />}
               onPress={() => router.push('/account/settings')}
+            />
+            <ListRow
+              title="Acerca de"
+              subtitle="Código abierto, autor y licencias"
+              icon={<Info size={20} color={colors.primary} />}
+              onPress={() => router.push('/account/about')}
               isLast
             />
           </Section>

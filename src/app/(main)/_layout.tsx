@@ -17,6 +17,7 @@ export default function MainLayout() {
       <Stack.Screen name="index" options={{ headerShown: false, animation: 'fade' }} />
       <Stack.Screen name="profile" options={{ title: 'Mi perfil' }} />
       <Stack.Screen name="settings" options={{ title: 'Configuración de la app' }} />
+      <Stack.Screen name="about" options={{ title: 'Acerca de' }} />
       <Stack.Screen name="family/[id]" options={{ title: 'Administrar familia' }} />
     </Stack>
   );

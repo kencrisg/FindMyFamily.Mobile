@@ -16,6 +16,7 @@ export default function AdminAccountLayout() {
     >
       <Stack.Screen name="index" options={{ title: 'Mi cuenta' }} />
       <Stack.Screen name="settings" options={{ title: 'Configuración de la app' }} />
+      <Stack.Screen name="about" options={{ title: 'Acerca de' }} />
     </Stack>
   );
 }

@@ -1,7 +1,7 @@
 import React from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import { ScrollView, View, Text, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
-import { LogOut, ChevronRight, Settings, SlidersHorizontal, UserPen } from 'lucide-react-native';
+import { Info, LogOut, ChevronRight, Settings, SlidersHorizontal, UserPen } from 'lucide-react-native';
 import { useAuthStore } from '../../../auth/application/auth.store';
 import { isFamilyAdminRole } from '../../../family/presentation/components/family-roles';
 import { makeStyles, useTheme } from '../../../../shared/theme/use-theme';
@@ -22,7 +22,10 @@ export const MeSheetView: React.FC<MeSheetViewProps> = ({ onLogout }) => {
     : 'YO';
 
   return (
-    <View style={styles.container}>
+    <ScrollView
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={styles.container}
+    >
       {/* Profile Header Card */}
       <View style={styles.profileCard}>
         <View style={styles.avatar}>
@@ -93,12 +96,31 @@ export const MeSheetView: React.FC<MeSheetViewProps> = ({ onLogout }) => {
         </TouchableOpacity>
       </View>
 
+      {/* Acerca de: autor, repositorio de código abierto y licencias */}
+      <View style={styles.section}>
+        <TouchableOpacity
+          style={[styles.row, styles.lastRow]}
+          onPress={() => router.push('/about')}
+          activeOpacity={0.6}
+          accessibilityRole="button"
+        >
+          <View style={styles.rowIcon}>
+            <Info size={20} color={colors.primary} />
+          </View>
+          <View style={styles.rowContent}>
+            <Text style={styles.rowTitle}>Acerca de</Text>
+            <Text style={styles.rowSubtitle}>Código abierto, autor y licencias</Text>
+          </View>
+          <ChevronRight size={18} color={colors.textTertiary} />
+        </TouchableOpacity>
+      </View>
+
       {/* Logout Action */}
       <TouchableOpacity style={styles.logoutBtn} onPress={onLogout} activeOpacity={0.7}>
         <LogOut size={20} color={colors.danger} />
         <Text style={styles.logoutText}>Cerrar Sesión</Text>
       </TouchableOpacity>
-    </View>
+    </ScrollView>
   );
 };
 
@@ -149,7 +171,7 @@ const useStyles = makeStyles((colors) => ({
     backgroundColor: colors.cardBackground,
     borderRadius: Spacing.borderRadiusMd,
     paddingHorizontal: Spacing.lg,
-    marginBottom: Spacing.xl,
+    marginBottom: Spacing.lg,
     borderWidth: 1,
     borderColor: colors.borderSubtle,
   },

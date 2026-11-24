@@ -18,9 +18,14 @@ interface AppleMapViewProps {
   currentUserId?: string | null;
 }
 
+export interface CenterOnUserOptions {
+  /** En modo silencioso (al abrir la app) no muestra alertas si falta permiso o señal GPS. */
+  silent?: boolean;
+}
+
 /** Acciones del mapa que se pueden lanzar desde fuera (p. ej. al tocar "Yo" en la lista). */
 export interface AppleMapViewHandle {
-  centerOnUser: () => void;
+  centerOnUser: (options?: CenterOnUserOptions) => void;
 }
 
 /** Antigüedad máxima de la última posición conocida para mostrarla mientras llega la nueva. */
@@ -28,8 +33,11 @@ const QUICK_POSITION_MAX_AGE_MS = 5 * 60_000;
 /** Tiempo máximo esperando una lectura nueva del GPS. */
 const FRESH_POSITION_TIMEOUT_MS = 10_000;
 
-const DEFAULT_LAT = 19.432608;
-const DEFAULT_LNG = -99.133209;
+/** Ubicación inicial del mapa al iniciar sesión (centro geográfico de Ecuador). */
+const DEFAULT_LAT = -1.831239;
+const DEFAULT_LNG = -78.183406;
+/** Zoom inicial para encuadrar el territorio continental de Ecuador en pantalla. */
+const DEFAULT_ZOOM = 6;
 
 /** Margen superior de los controles flotantes; la atribución del mapa se alinea con ellos. */
 const TOP_OFFSET = Platform.OS === 'ios' ? 60 : 44;
@@ -53,6 +61,16 @@ export const AppleMapView = forwardRef<AppleMapViewHandle, AppleMapViewProps>(fu
   const [isMapLoaded, setIsMapLoaded] = useState(false);
   const [mapError, setMapError] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
+  const isMapLoadedRef = useRef(false);
+  const selectedMemberRef = useRef(selectedMember);
+  const isLocatingRef = useRef(false);
+  const pendingUserLocationRef = useRef<{
+    coords: { latitude: number; longitude: number };
+    fly: boolean;
+  } | null>(null);
+
+  isMapLoadedRef.current = isMapLoaded;
+  selectedMemberRef.current = selectedMember;
 
   // Sync data to Leaflet webview
   const pushDataToMap = useCallback(() => {
@@ -122,62 +140,101 @@ export const AppleMapView = forwardRef<AppleMapViewHandle, AppleMapViewProps>(fu
     }
   };
 
-  const showUserOnMap = useCallback((coords: { latitude: number; longitude: number }) => {
-    webViewRef.current?.injectJavaScript(`
-      if (window.setUserLocation) {
-        window.setUserLocation(${coords.latitude}, ${coords.longitude});
+  const injectUserLocation = useCallback(
+    (coords: { latitude: number; longitude: number }, fly: boolean) => {
+      webViewRef.current?.injectJavaScript(`
+        if (window.setUserLocation) {
+          window.setUserLocation(${coords.latitude}, ${coords.longitude});
+        }
+        ${
+          fly
+            ? `if (window.flyToLocation) {
+          window.flyToLocation(${coords.latitude}, ${coords.longitude}, 16);
+        }`
+            : ''
+        }
+        true;
+      `);
+    },
+    []
+  );
+
+  const showUserOnMap = useCallback(
+    (coords: { latitude: number; longitude: number }, fly = true) => {
+      if (!isMapLoadedRef.current || !webViewRef.current) {
+        // Si la ubicación llega antes de que Leaflet termine de cargar, se guarda
+        // para pintarla y centrar el mapa en cuanto se dispare MAP_READY.
+        pendingUserLocationRef.current = { coords, fly };
+        return;
       }
-      if (window.flyToLocation) {
-        window.flyToLocation(${coords.latitude}, ${coords.longitude}, 16);
-      }
-      true;
-    `);
-  }, []);
+      injectUserLocation(coords, fly);
+    },
+    [injectUserLocation]
+  );
+
+  useEffect(() => {
+    if (!isMapLoaded || !pendingUserLocationRef.current) return;
+    const pending = pendingUserLocationRef.current;
+    pendingUserLocationRef.current = null;
+    const shouldFly = pending.fly && !selectedMemberRef.current;
+    injectUserLocation(pending.coords, shouldFly);
+  }, [isMapLoaded, injectUserLocation]);
 
   /**
    * Centra el mapa en el usuario. Antes esperaba una lectura nueva del GPS que, si no
    * llegaba, dejaba el botón sin hacer nada y sin ningún aviso. Ahora:
    *   1. muestra al instante la última posición conocida (si es reciente),
    *   2. la afina con una lectura nueva, esperando como mucho 10 s,
-   *   3. y si no hay ninguna de las dos, lo dice.
+   *   3. y si no hay ninguna de las dos, lo dice (salvo en modo silencioso al iniciar).
    */
-  const handleCenterOnUser = useCallback(async () => {
-    if (isLocating) return;
-    setIsLocating(true);
-    try {
-      let { status } = await Location.getForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        ({ status } = await Location.requestForegroundPermissionsAsync());
-      }
-      if (status !== 'granted') {
-        Alert.alert(
-          'Permiso de ubicación',
-          'Para ver dónde estás, permite el acceso a la ubicación en los ajustes del teléfono.'
-        );
-        return;
-      }
+  const handleCenterOnUser = useCallback(
+    async (options?: CenterOnUserOptions) => {
+      if (isLocatingRef.current) return;
+      isLocatingRef.current = true;
+      setIsLocating(true);
+      const silent = options?.silent ?? false;
 
-      const quick = await Location.getLastKnownPositionAsync({
-        maxAge: QUICK_POSITION_MAX_AGE_MS,
-      }).catch(() => null);
-      if (quick) showUserOnMap(quick.coords);
+      try {
+        let { status } = await Location.getForegroundPermissionsAsync();
+        if (status !== 'granted' && !silent) {
+          ({ status } = await Location.requestForegroundPermissionsAsync());
+        }
+        if (status !== 'granted') {
+          if (!silent) {
+            Alert.alert(
+              'Permiso de ubicación',
+              'Para ver dónde estás, permite el acceso a la ubicación en los ajustes del teléfono.'
+            );
+          }
+          return;
+        }
 
-      // Precisión alta = GPS. Con `Balanced`, Android solo usa wifi y antenas: sin ellas
-      // (interiores sin wifi, o el emulador) no encendía el GPS y nunca llegaba respuesta.
-      // Es una lectura única que el usuario pide a propósito, así que el consumo no importa.
-      const fresh = await getFreshPosition(Location.Accuracy.High, FRESH_POSITION_TIMEOUT_MS);
-      if (fresh) {
-        showUserOnMap(fresh.coords);
-      } else if (!quick) {
-        Alert.alert(
-          'No se encontró tu ubicación',
-          'Comprueba que la ubicación del teléfono esté activada. Al aire libre el GPS la encuentra antes.'
-        );
+        const canFly = () => !(silent && selectedMemberRef.current);
+
+        const quick = await Location.getLastKnownPositionAsync({
+          maxAge: QUICK_POSITION_MAX_AGE_MS,
+        }).catch(() => null);
+        if (quick) showUserOnMap(quick.coords, canFly());
+
+        // Precisión alta = GPS. Con `Balanced`, Android solo usa wifi y antenas: sin ellas
+        // (interiores sin wifi, o el emulador) no encendía el GPS y nunca llegaba respuesta.
+        // Es una lectura única que el usuario pide a propósito, así que el consumo no importa.
+        const fresh = await getFreshPosition(Location.Accuracy.High, FRESH_POSITION_TIMEOUT_MS);
+        if (fresh) {
+          showUserOnMap(fresh.coords, canFly());
+        } else if (!quick && !silent) {
+          Alert.alert(
+            'No se encontró tu ubicación',
+            'Comprueba que la ubicación del teléfono esté activada. Al aire libre el GPS la encuentra antes.'
+          );
+        }
+      } finally {
+        isLocatingRef.current = false;
+        setIsLocating(false);
       }
-    } finally {
-      setIsLocating(false);
-    }
-  }, [isLocating, showUserOnMap]);
+    },
+    [showUserOnMap]
+  );
 
   const zoom = (direction: 'in' | 'out') => {
     webViewRef.current?.injectJavaScript(`
@@ -186,9 +243,13 @@ export const AppleMapView = forwardRef<AppleMapViewHandle, AppleMapViewProps>(fu
     `);
   };
 
-  useImperativeHandle(ref, () => ({ centerOnUser: () => void handleCenterOnUser() }), [
-    handleCenterOnUser,
-  ]);
+  useImperativeHandle(
+    ref,
+    () => ({
+      centerOnUser: (options?: CenterOnUserOptions) => void handleCenterOnUser(options),
+    }),
+    [handleCenterOnUser]
+  );
 
   const htmlContent = `
 <!DOCTYPE html>
@@ -378,7 +439,7 @@ export const AppleMapView = forwardRef<AppleMapViewHandle, AppleMapViewProps>(fu
       bounceAtZoomLimits: false,
       minZoom: 3,
       maxZoom: 19
-    }).setView([${DEFAULT_LAT}, ${DEFAULT_LNG}], 13);
+    }).setView([${DEFAULT_LAT}, ${DEFAULT_LNG}], ${DEFAULT_ZOOM});
 
     L.control.attribution({ position: 'topleft', prefix: false }).addTo(map);
 
@@ -533,7 +594,7 @@ export const AppleMapView = forwardRef<AppleMapViewHandle, AppleMapViewProps>(fu
         <TouchableOpacity
           style={styles.controlButton}
           activeOpacity={0.8}
-          onPress={handleCenterOnUser}
+          onPress={() => void handleCenterOnUser()}
           accessibilityRole="button"
           accessibilityLabel="Mostrar dónde estoy"
         >

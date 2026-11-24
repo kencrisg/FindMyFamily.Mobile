@@ -85,22 +85,29 @@ export const FindMyMainScreen: React.FC = () => {
   const snapPoints = useMemo(() => ['18%', '45%', '85%'], []);
 
   useEffect(() => {
+    let isMounted = true;
+
     // 1. Fetch initial families & members
     fetchFamilies();
 
     // 2. Request permissions. El resultado se muestra: antes se descartaba y el usuario
     //    no sabía que su teléfono no podría responder a las peticiones de la familia.
     BackgroundTaskManager.requestPermissions().then((permissions) => {
+      if (!isMounted) return;
       if (!permissions.foreground) {
         setPermissionWarning(
           'Sin permiso de ubicación, tu familia no podrá localizarte. Actívalo en los ajustes del teléfono.'
         );
-      } else if (!permissions.background) {
-        setPermissionWarning(
-          'Falta el permiso de ubicación en segundo plano: solo podrás compartir tu ubicación con la app abierta.'
-        );
       } else {
-        setPermissionWarning(null);
+        if (!permissions.background) {
+          setPermissionWarning(
+            'Falta el permiso de ubicación en segundo plano: solo podrás compartir tu ubicación con la app abierta.'
+          );
+        } else {
+          setPermissionWarning(null);
+        }
+        // Al abrir la app con sesión activa o recién iniciada, centra el mapa en la ubicación actual.
+        mapRef.current?.centerOnUser({ silent: true });
       }
     });
 
@@ -108,6 +115,7 @@ export const FindMyMainScreen: React.FC = () => {
     startSignalR();
 
     return () => {
+      isMounted = false;
       stopSignalR();
     };
   }, []);

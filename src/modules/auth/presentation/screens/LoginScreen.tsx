@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, KeyboardAvoidingView, Platform, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, Keyboard, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ShieldCheck, MapPin } from 'lucide-react-native';
 import { useAuthStore } from '../../application/auth.store';
@@ -18,6 +18,9 @@ export const LoginScreen: React.FC = () => {
   const [validationError, setValidationError] = useState('');
 
   const handleLogin = async () => {
+    // Cerramos el teclado al pulsar "Iniciar Sesión" para que no quede abierto durante
+    // la validación ni al entrar a la pantalla del mapa.
+    Keyboard.dismiss();
     setValidationError('');
     clearError();
 
@@ -71,7 +74,7 @@ export const LoginScreen: React.FC = () => {
 
             <CustomInput
               label="Número de Teléfono"
-              placeholder="Ej: +525512345678"
+              placeholder="Ej: 0995900000"
               value={phoneNumber}
               onChangeText={(text) => {
                 setPhoneNumber(text);

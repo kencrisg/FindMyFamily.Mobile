@@ -1,8 +1,8 @@
 import React, { useCallback, useState } from 'react';
-import { Alert, Linking, ScrollView, Switch } from 'react-native';
+import { Alert, Linking, Platform, ScrollView, Switch } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import * as Location from 'expo-location';
-import { MapPin, Shield, Smartphone } from 'lucide-react-native';
+import { BatteryCharging, MapPin, Shield, Smartphone } from 'lucide-react-native';
 import { selectIsSuperAdmin, useAuthStore } from '../../../auth/application/auth.store';
 import { useProfileActions } from '../../../profile/application/use-profile-actions';
 import { Badge } from '../../../../shared/presentation/components/Badge';
@@ -12,6 +12,7 @@ import { SegmentedControl } from '../../../../shared/presentation/components/Seg
 import { ThemePreference, useThemeStore } from '../../../../shared/theme/theme.store';
 import { makeStyles, useTheme } from '../../../../shared/theme/use-theme';
 import { Spacing } from '../../../../shared/theme/typography';
+import { requestIgnoreBatteryOptimizations } from '../../infrastructure/battery-optimization';
 
 const APPEARANCE_OPTIONS: ReadonlyArray<{ value: ThemePreference; label: string }> = [
   { value: 'light', label: 'Claro' },
@@ -92,6 +93,31 @@ export const AppSettingsScreen: React.FC = () => {
     );
   };
 
+  const handleBatteryPress = () => {
+    // Se explica antes de salir de la app: el diálogo del sistema solo muestra
+    // "Permitir/Denegar" y no cuenta por qué hace falta.
+    Alert.alert(
+      'Batería sin restricciones',
+      'Android puede suspender la app cuando la cierras desde Recientes, y entonces deja de responder a tu familia. En la siguiente pantalla elige "Sin restricciones" (o "Permitir").\n\nSi tu teléfono no muestra ese diálogo, te llevaré a los ajustes de FindMyFamily: entra en "Batería" y elige "Sin restricciones".\n\nSi es Xiaomi, Redmi o POCO, activa también "Inicio automático". En Samsung, revisa que FindMyFamily no esté en "Apps en suspensión".',
+      [
+        { text: 'Ahora no', style: 'cancel' },
+        {
+          text: 'Abrir ajustes',
+          onPress: () => {
+            void requestIgnoreBatteryOptimizations().then((result) => {
+              if (result === 'failed') {
+                Alert.alert(
+                  'No se pudieron abrir los ajustes',
+                  'Abre Ajustes → Apps → FindMyFamily → Batería y elige "Sin restricciones".'
+                );
+              }
+            });
+          },
+        },
+      ]
+    );
+  };
+
   // Se vuelve a comprobar al regresar a la pantalla: lo normal es ir a los ajustes del
   // teléfono a dar el permiso y volver.
   useFocusEffect(
@@ -150,6 +176,14 @@ export const AppSettingsScreen: React.FC = () => {
               icon={<MapPin size={20} color={colors.warning} />}
               trailing={<Badge label={permissionIssue.label} tone={permissionIssue.tone} />}
               onPress={() => void Linking.openSettings()}
+            />
+          ) : null}
+          {Platform.OS === 'android' ? (
+            <ListRow
+              title="Batería sin restricciones"
+              subtitle="Evita que Android suspenda la app cuando se cierra desde Recientes"
+              icon={<BatteryCharging size={20} color={colors.secondary} />}
+              onPress={handleBatteryPress}
             />
           ) : null}
           <ListRow
